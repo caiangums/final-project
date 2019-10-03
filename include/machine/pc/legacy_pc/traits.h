@@ -142,7 +142,7 @@ template<> struct Traits<Scratchpad>: public Traits<Machine_Common>
 
 template<> struct Traits<Ethernet>: public Traits<Machine_Common>
 {
-    typedef LIST<PCNet32> DEVICES;
+    typedef LIST<E100> DEVICES;
     static const unsigned int UNITS = DEVICES::Length;
 
     static const bool enabled = (Traits<Build>::NODES > 1) && (UNITS > 0);
