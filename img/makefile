@@ -35,9 +35,9 @@ endif
 
 PEER_EMULATOR	:= $(subst 1235,1236,$(EMULATOR))
 
-NETWORK	        := -netdev socket,id=vlan0,listen=:1234           -object filter-dump,id=dump0,netdev=vlan0,file=$(APPLICATION).pcap   -device i82559er,id=eth0,netdev=vlan0,mac=56:34:12:00:54:08 -device i82559er,id=eth1,mac=00:00:00:00:00:01
+NETWORK	        := -netdev socket,id=vlan0,listen=:1234           -object filter-dump,id=dump0,netdev=vlan0,file=$(APPLICATION).pcap   -device i82558a,id=eth0,netdev=vlan0,mac=56:34:12:00:54:08 -device i82558a,id=eth1,mac=00:00:00:00:00:01
 # add the rest of the line to enable a dhcp server -netdev user,id=1,ipv6=off,restrict=on,net=10.0.1.0/24,host=10.0.1.1,dhcpstart=10.0.1.8
-PEER_NETWORK	:= -netdev socket,id=vlan0,connect=127.0.0.1:1234 -object filter-dump,id=dump0,netdev=vlan0,file=$(PEER).pcap -device i82559er,id=eth0,netdev=vlan0,mac=56:34:12:00:54:09 -device i82559er,id=eth1,mac=00:00:00:00:00:02
+PEER_NETWORK	:= -netdev socket,id=vlan0,connect=127.0.0.1:1234 -object filter-dump,id=dump0,netdev=vlan0,file=$(PEER).pcap -device i82558a,id=eth0,netdev=vlan0,mac=56:34:12:00:54:09 -device i82558a,id=eth1,mac=00:00:00:00:00:02
 
 ifeq ($(NODES),1)
 

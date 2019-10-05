@@ -521,13 +521,93 @@ protected:
 
 };
 
-class E100: public NIC<Ethernet>, private IF<Traits<E100>::qemu, i82559ER, i82559c>::Result
+class i82558a: public i8255x // Our implementation
+{
+protected:
+    // PCI ID
+    static const unsigned int PCI_VENDOR_ID = 0x8086;
+    static const unsigned int PCI_DEVICE_ID = 0x1229;
+    static const unsigned int PCI_REG_IO = 1;
+    static const unsigned int PCI_REG_MEM = 0;
+
+    static const unsigned int TBD_ARRAY_SIZE = 1;
+
+protected:
+
+    struct Transmit_Buffer_Descriptor {
+        volatile Reg32 address;
+        volatile Reg16 even_word;
+        volatile Reg16 odd_word;
+
+        enum {
+            // AND-masks
+            SIZE_MASK   =   0x7fff, // Take into account half word
+            EL_MASK     =   0x1     // Take into account half word
+        };
+
+        bool el() {
+            return odd_word & EL_MASK;
+        }
+
+        Reg16 size() {
+            return even_word & SIZE_MASK;
+        }
+
+        void size(Reg16 size) {
+            even_word = SIZE_MASK & size; // using SIZE_MASK to ensure that the last bit of even_word is zero.
+        }
+    };
+    typedef Transmit_Buffer_Descriptor TBD;
+
+    /* QEMU 2.4 requires from the TCB to use a TBD even while using simplified
+     * memory structure.
+     * Because of that, we keep tbd_array = 0xFFFFFFFF and tbd_number = 0
+     * Such workaround is not expected to work on a physical E100.
+     * For that, prefer using i82559c instead.
+     * */
+    struct Tx_Desc: public i8255x::Base_Tx_Desc {
+        TBD tbds[TBD_ARRAY_SIZE];
+
+        char _frame[FRAME_SIZE]; // XXX: Since TBD is in use, this could be placed at another place (e.g. TX Buffer).
+
+        Reg32 _pad[3];
+
+        Tx_Desc(Reg32 phy_of_next) : i8255x::Base_Tx_Desc(phy_of_next) {
+            for (unsigned int i = 0; i < TBD_ARRAY_SIZE; i++) {
+                /// tbds[i].address = reinterpret_cast<Reg32>(_frame); /// XXX: maybe must be the physical address of _frame here.
+                tbds[i].address = (phy_of_next - align128(sizeof(Tx_Desc))) + (reinterpret_cast<Reg32>(_frame) - reinterpret_cast<Reg32>(this));
+                // db<void>(WRN) << "(0) frame: " << reinterpret_cast<void *>(_frame) << " this: " << this << endl;
+                // db<void>(WRN) << "(1) _frame: " << reinterpret_cast<void *>(tbds[i].address) << endl;
+                // unsigned long present;
+                // db<void>(WRN) << "(2) _frame: " << reinterpret_cast<void *>(MMU_Aux::physical_address(reinterpret_cast<Reg32>(_frame), &present)) << endl;
+
+                tbds[i].size(FRAME_SIZE);
+            }
+        }
+
+        friend Debug & operator<<(Debug & db, const Tx_Desc & d) {
+            db << "{" << reinterpret_cast<void *>(d.tbd_array) << ", "
+               << d.tcb_byte_count << ", "
+               << reinterpret_cast<void *>(d.threshold) << ", "
+               << reinterpret_cast<void *>(d.tbd_number)
+               << "}";
+
+            return db;
+        }
+
+        char * frame() {
+            return _frame;
+        }
+    };
+};
+
+class E100: public NIC<Ethernet>, private IF<Traits<E100>::qemu, i82558a, i82559c>::Result
 {
     friend class Machine_Common;
 
 private:
     // The E100 engine
-    typedef IF<Traits<E100>::qemu, i82559ER, i82559c>::Result Engine;
+    typedef IF<Traits<E100>::qemu, i82558a, i82559c>::Result Engine;
 
     // PCI ID
     static const unsigned int PCI_VENDOR_ID = Engine::PCI_VENDOR_ID;
