@@ -3,6 +3,7 @@
 #include <communicator.h>
 #include <machine/nic.h>
 #include <time.h>
+#include "dir_protocol.h"
 
 using namespace EPOS;
 

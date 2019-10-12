@@ -1,9 +1,11 @@
 #include <machine/nic.h>
 
+__BEGIN_SYS
+
 // A simple abstraction for connectionless channels, that simply forwards data
 // from the application to the next lower level. DIR_Protocol is responsible for
 // decoupling the application from the network communication.
-public class DIR_Protocol: public NIC<Ethernet>//Concurrent_Observer<NIC<Ethernet>::Observer::Observed_Data, Ethernet::Observer::Observing_Condition>
+class DIR_Protocol: public NIC<Ethernet>::Observer//Concurrent_Observer<NIC<Ethernet>::Observer::Observed_Data, Ethernet::Observer::Observing_Condition>
 {
     //friend class System;
     //friend class Network_Common;
@@ -132,3 +134,4 @@ protected:
     
 };
 
+__END_SYS
