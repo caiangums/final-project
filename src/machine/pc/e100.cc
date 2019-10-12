@@ -12,7 +12,7 @@ int i8255x::exec_command(Reg8 cmd, Reg32 dma_addr)
 
     // previous command is accepted when SCB clears
     for(i = 0; i < i82559_WAIT_SCB_TIMEOUT; i++) {
-        if(!read8(&_csr->scb.cmd_lo))
+        if(!read16(&_csr->scb.stat))
             break;
         udelay(5);
         if(i > i82559_WAIT_SCB_FAST)
@@ -24,7 +24,7 @@ int i8255x::exec_command(Reg8 cmd, Reg32 dma_addr)
     if(i == i82559_WAIT_SCB_TIMEOUT)
         return 1;
 
-    write8(cmd, &_csr->scb.cmd_lo);
+    write16(cmd, &_csr->scb.stat);
 
     return 0;
 }
@@ -48,6 +48,7 @@ void E100::int_handler(const IC::Interrupt_Id & interrupt)
     db<E100>(TRC) << "E100::int_handler(int=" << interrupt << ",dev=" << dev << ")" << endl;
 
     if (HYSTERICALLY_DEBUGGED && dev) {
+        dev->print_csr();
         dev->print_status();
     }
 
@@ -179,7 +180,7 @@ void E100::reset()
     while(exec_command(ruc_load_base, 0));
 
     // set new configuration
-    i82559_configure();
+    i82558a_configure();
     configCB->command &= ~cb_s;
     configCB->link = _macAddrCB_phy;
 
@@ -189,7 +190,8 @@ void E100::reset()
     macAddrCB->command |= cb_el;
     macAddrCB->iaaddr = _address;
 
-    i82559_disable_irq();
+    // i82559_disable_irq();
+    i82558a_disable_irq();
 
     while(exec_command(cuc_start, _configCB_phy));
     udelay(2 * 1000);
@@ -210,7 +212,7 @@ void E100::reset()
     while(exec_command(ruc_start, _rx_ring_phy));
     udelay(10);
 
-    i82559_enable_irq();
+    i82558a_enable_irq();
     //i82559_disable_irq();
     udelay(10);
 }
@@ -459,23 +461,23 @@ unsigned short E100::eeprom_read(unsigned short *addr_len, unsigned short addr) 
     unsigned long cmd_addr_data;
     cmd_addr_data = (EE_READ_CMD(*addr_len) | addr) << 16;
 
-    _csr->eeprom_ctrl_lo = eecs | eesk;
-    i82559_flush();
+    _csr->eeprom_ctrl = eecs | eesk;
+    // i82559_flush();
     udelay(200);
 
     unsigned short data = 0;
     unsigned char ctrl;
     for (int i = 31; i >= 0; i--) {
         ctrl = (cmd_addr_data & (1 << i)) ? eecs | eedi : eecs;
-        _csr->eeprom_ctrl_lo = ctrl;
-        i82559_flush();
+        _csr->eeprom_ctrl = ctrl;
+        // i82559_flush();
         udelay(200);
 
-        _csr->eeprom_ctrl_lo = ctrl | eesk;
-        i82559_flush();
+        _csr->eeprom_ctrl = ctrl | eesk;
+        // i82559_flush();
         udelay(200);
 
-        ctrl = _csr->eeprom_ctrl_lo;
+        ctrl = _csr->eeprom_ctrl;
         if (!(ctrl & eedo) && i > 16) {
             *addr_len -= (i - 16);
             i = 17;
@@ -484,8 +486,8 @@ unsigned short E100::eeprom_read(unsigned short *addr_len, unsigned short addr) 
         data = (data << 1) | (ctrl & eedo ? 1 : 0);
     }
 
-    _csr->eeprom_ctrl_lo = 0;
-    i82559_flush();
+    _csr->eeprom_ctrl = 0;
+    // i82559_flush();
     udelay(200);
 
     return data;
@@ -517,14 +519,17 @@ void E100::handle_int() {
     db<E100>(TRC) << "E100::handle_int()" << endl;
     db<E100>(TRC) << ">" << endl;
 
-    Reg8 stat_ack = read8(&_csr->scb.stat_ack);
-    Reg8 status = read8(&_csr->scb.status);
+    Reg16 status = read16(&_csr->scb.stat);
+
+    Reg8 stat_ack = (Reg8) (status >> 8);
+    Reg8 stat = (Reg8) (status);
 
     if ((stat_ack != NOT_OURS) && (stat_ack != NOT_PRESENT)) {
         db<E100>(TRC) << "...if" << endl;
 
         // acknowledge interrupt(s) in one PCI write cycle
-        write8((stat_ack & ~SWI), &_csr->scb.stat_ack); /* Writing 1 back to a
+        Reg16 ack = ((stat_ack & ~SWI) << 4) | stat;
+        write8(ack, &_csr->scb.stat); /* Writing 1 back to a
             * STAT/ACK bit that was set will acknowledge that particular
             * interrupt bit.
             * The device will de-assert its interrupt line only when all pending
@@ -533,7 +538,7 @@ void E100::handle_int() {
             * SWI interrupt.
             */
 
-        if ((((status & RUS_MASK) >> RUS_SHIFT) == RUS_NO_RESOURCES) && (stat_ack & RNR)) {
+        if ((((stat & RUS_MASK) >> RUS_SHIFT) == RUS_NO_RESOURCES) && (stat_ack & RNR)) {
             _rx_ruc_no_more_resources++;
         }
 
@@ -605,7 +610,7 @@ void E100::handle_int() {
     // IC::enable(IC::irq2int(_irq));
 }
 
-void E100::i82559_configure(void)
+void E100::i82558a_configure(void)
 {
     configCB->command = cb_config;
     memset(&(configCB->config), 0, sizeof(struct config));
@@ -662,10 +667,10 @@ int E100::self_test()
     dmadump->selftest.result = 0xFFFFFFFF;
 
     write32(SELFTEST | dma_addr, &_csr->port);
-    i82559_flush();
+    // i82559_flush();
     udelay(20 * 1000); // wait for 10 miliseconds
 
-    i82559_disable_irq();
+    i82558a_disable_irq();
 
     // Check results of self-test
     if(dmadump->selftest.result != 0) {

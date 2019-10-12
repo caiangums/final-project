@@ -59,7 +59,7 @@ public:
     #define EEPROM_SK_DELAY     (1000)    // Delay between clock edges *and* data read or transition; 3 of these per bit.
     #define EEPROM_DONE_DELAY   (1000)    // Delay when all done
 
-    enum eeprom_ctrl_lo {
+    enum eeprom_flags {
         eesk = 0x01, //EEPROM Data Output (Flash Address[15])
         eecs = 0x02, //EEPROM Chip Select
         eedi = 0x04, //EEPROM Data Input
@@ -69,18 +69,29 @@ public:
     /* CSR (Control/Status Registers) */
     typedef struct CSR {
         struct {
-            volatile Reg8 status;
-            volatile Reg8 stat_ack;
-            volatile Reg8 cmd_lo;
-            volatile Reg8 cmd_hi;
+            volatile Reg16 cmd;
+            volatile Reg16 stat;
             volatile Reg32 gen_ptr;
         } scb;
         volatile Reg32 port;
-        volatile Reg16 flash_ctrl;
-        volatile Reg8 eeprom_ctrl_lo;
-        volatile Reg8 eeprom_ctrl_hi;
+        volatile Reg16 eeprom_ctrl;
+        volatile Reg16 res_1; // reserved
         volatile Reg32 mdi_ctrl;
         volatile Reg32 rx_dma_count;
+        volatile Reg8  pmdr;
+        volatile Reg16 flw_ctrl;
+        volatile Reg8  res_2; // reserved
+        volatile Reg16 res_3; // reserved
+        volatile Reg8  gen_stat;
+        volatile Reg8  gen_ctrl;
+        volatile Reg32 res_4; // reserved
+        volatile Reg32 res_5; // reserved
+        volatile Reg32 res_6; // reserved
+        volatile Reg32 res_7; // reserved
+        volatile Reg32 fnc_evt;
+        volatile Reg32 fnc_evt_mask;
+        volatile Reg32 fnc_pres_stat;
+        volatile Reg32 forc_evt;
     } CSR_Desc;
 
     enum port {
@@ -666,23 +677,27 @@ private:
     unsigned short eeprom_read(unsigned short * addr_len, unsigned short addr);
     unsigned char eeprom_mac_address(Reg16 addr);
 
-    void i82559_flush() { read8(&_csr->scb.status); }
-    void i82559_disable_irq() { write8(irq_mask_all, &_csr->scb.cmd_hi); }
-    void i82559_enable_irq() { write8(irq_mask_none, &_csr->scb.cmd_hi); }
+    // void i82559_flush() { read8(&_csr->scb.stat); }
+    // void i82559_disable_irq() { write8(irq_mask_all, &_csr->scb.cmd_hi); }
+    // void i82559_enable_irq() { write8(irq_mask_none, &_csr->scb.cmd_hi); }
+
+    void i82558a_disable_irq() { write8(irq_mask_all, &_csr->scb.cmd); }
+    void i82558a_enable_irq() { write8(irq_mask_none, &_csr->scb.cmd); }
 
     int self_test();
 
     void software_reset() {
-        write32(SELECTIVE_RESET, &_csr->port);
-        i82559_flush(); udelay(20 * 1000);
         write32(SOFTWARE_RESET, &_csr->port);
-        i82559_flush(); udelay(20 * 1000);
+        // it should wait for correct accessing the device
+        udelay(20 * 1000);
         // disable IRQs
-        i82559_disable_irq();
-        i82559_flush(); udelay(1000);
+        i82558a_disable_irq();
+        // udelay(1000);
     }
 
-    void i82559_configure(void);
+    // void i82559_configure(void);
+
+    void i82558a_configure(void);
 
     static E100 * get_by_unit(unsigned int unit) {
         assert(unit < UNITS);
@@ -703,19 +718,22 @@ private:
 private:
    void print_csr() {
         db<E100>(WRN) << "CSR = " << _csr << endl;
-        // db<E100>(WRN) << "CSR.SCB: " << csr->scb << endl;
-        db<E100>(WRN) << "status = " << hex << _csr->scb.status << endl;
-        db<E100>(WRN) << "stat_ack = " << hex << _csr->scb.stat_ack << endl;
-        db<E100>(WRN) << "SCB Command: " << reinterpret_cast<void *>(*reinterpret_cast<unsigned long *>(_csr)) << endl;
-        db<E100>(WRN) << "cmd_lo: [" << _csr->scb.cmd_lo << "] => " << _csr->scb.cmd_lo << endl;
-        db<E100>(WRN) << "cmd_hi: [" << _csr->scb.cmd_hi << "] => " << _csr->scb.cmd_hi << endl;
-        db<E100>(WRN) << "gen_ptr: [" << _csr->scb.gen_ptr << "] => " << *reinterpret_cast<volatile Reg32 *>(&_csr->scb.gen_ptr) << endl;
-        db<E100>(WRN) << "port: [" << _csr->port << "] => " << *reinterpret_cast<volatile Reg32 *>(&_csr->port) << endl;
-        // db<E100>(WRN) << "flash_ctrl: [" << _csr->flash_ctrl << "] => " << *reinterpret_cast<volatile Reg16 *>(&_csr->flash_ctrl) << endl;
-        db<E100>(WRN) << "eeprom_ctrl_lo: [" << _csr->eeprom_ctrl_lo << "] => " << *reinterpret_cast<volatile Reg8 *>(&_csr->eeprom_ctrl_lo) << endl;
-        db<E100>(WRN) << "eeprom_ctrl_hi: [" << _csr->eeprom_ctrl_hi << "] => " << *reinterpret_cast<volatile Reg8 *>(&_csr->eeprom_ctrl_hi) << endl;
-        db<E100>(WRN) << "mdi_ctrl: [" << _csr->mdi_ctrl << "] => " << *reinterpret_cast<volatile Reg32 *>(&_csr->mdi_ctrl) << endl;
-        db<E100>(WRN) << "rx_dma_count: [" << _csr->rx_dma_count << "] => " << *reinterpret_cast<volatile Reg32 *>(&_csr->rx_dma_count) << endl;
+        db<E100>(WRN) << "CSR.SCB: " << &_csr->scb << endl;
+        db<E100>(WRN) << "  cmd: [" << _csr->scb.cmd << "] => " << *reinterpret_cast<volatile Reg16 *>(&_csr->scb.cmd) << endl;
+        db<E100>(WRN) << "  stat: [" << _csr->scb.stat << "] => " << *reinterpret_cast<volatile Reg16 *>(&_csr->scb.stat) << endl;
+        db<E100>(WRN) << "  gen_ptr: [" << _csr->scb.gen_ptr << "] => " << *reinterpret_cast<volatile Reg32 *>(&_csr->scb.gen_ptr) << endl;
+        db<E100>(WRN) << "CSR.port: [" << _csr->port << "] => " << *reinterpret_cast<volatile Reg32 *>(&_csr->port) << endl;
+        db<E100>(WRN) << "CSR.eeprom_ctrl: [" << _csr->eeprom_ctrl << "] => " << *reinterpret_cast<volatile Reg16 *>(&_csr->eeprom_ctrl) << endl;
+        db<E100>(WRN) << "CSR.mdi_ctrl: [" << _csr->mdi_ctrl << "] => " << *reinterpret_cast<volatile Reg32 *>(&_csr->mdi_ctrl) << endl;
+        db<E100>(WRN) << "CSR.rx_dma_count: [" << _csr->rx_dma_count << "] => " << *reinterpret_cast<volatile Reg32 *>(&_csr->rx_dma_count) << endl;
+        db<E100>(WRN) << "CSR.pmdr: [" << _csr->pmdr << "] => " << *reinterpret_cast<volatile Reg8 *>(&_csr->pmdr) << endl;
+        db<E100>(WRN) << "CSR.flw_ctrl: [" << _csr->flw_ctrl << "] => " << *reinterpret_cast<volatile Reg16 *>(&_csr->flw_ctrl) << endl;
+        db<E100>(WRN) << "CSR.gen_stat: [" << _csr->gen_stat << "] => " << *reinterpret_cast<volatile Reg8 *>(&_csr->gen_stat) << endl;
+        db<E100>(WRN) << "CSR.gen_ctrl: [" << _csr->gen_ctrl << "] => " << *reinterpret_cast<volatile Reg8 *>(&_csr->gen_ctrl) << endl;
+        db<E100>(WRN) << "CSR.fnc_evt: [" << _csr->fnc_evt << "] => " << *reinterpret_cast<volatile Reg32 *>(&_csr->fnc_evt) << endl;
+        db<E100>(WRN) << "CSR.fnc_evt_mask: [" << _csr->fnc_evt_mask << "] => " << *reinterpret_cast<volatile Reg32 *>(&_csr->fnc_evt_mask) << endl;
+        db<E100>(WRN) << "CSR.fnc_pres_stat: [" << _csr->fnc_pres_stat << "] => " << *reinterpret_cast<volatile Reg32 *>(&_csr->fnc_pres_stat) << endl;
+        db<E100>(WRN) << "CSR.forc_evt: [" << _csr->forc_evt << "] => " << *reinterpret_cast<volatile Reg32 *>(&_csr->forc_evt) << endl;
     }
 
     void print_status() {
@@ -725,7 +743,10 @@ private:
         // SCB Status Word, STAT/ACK bits
         db<E100>(WRN) << "STAT/ACK = ";
 
-        Reg8 stat_ack = read8(&_csr->scb.stat_ack);
+        Reg16 status = read16(&_csr->scb.stat);
+
+        Reg8 stat_ack = (Reg8) (status >> 8);
+        Reg8 stat = (Reg8) (status);
 
         if (stat_ack == NOT_PRESENT) {
             db<E100>(WRN) << "NOT_PRESENT" << endl;
@@ -743,27 +764,26 @@ private:
             db<E100>(WRN) << endl;
         }
 
-        Reg8 status = read8(&_csr->scb.status);
         db<E100>(WRN) << "CU = ";
-        if (((status & CUS_MASK) >> CUS_SHIFT) == CUS_HQP_ACTIVE)
+        if (((stat & CUS_MASK) >> CUS_SHIFT) == CUS_HQP_ACTIVE)
             db<E100>(WRN) << "CUS_HQP_ACTIVE" << endl;
-        else if (((status & CUS_MASK) >> CUS_SHIFT) == CUS_LPQ_ACTIVE)
+        else if (((stat & CUS_MASK) >> CUS_SHIFT) == CUS_LPQ_ACTIVE)
             db<E100>(WRN) << "CUS_LPQ_ACTIVE" << endl;
-        else if (((status & CUS_MASK) >> CUS_SHIFT) == CUS_SUSPENDED)
+        else if (((stat & CUS_MASK) >> CUS_SHIFT) == CUS_SUSPENDED)
             db<E100>(WRN) << "CUS_SUSPENDED" << endl;
-        else if (((status & CUS_MASK) >> CUS_SHIFT) == CUS_IDLE)
+        else if (((stat & CUS_MASK) >> CUS_SHIFT) == CUS_IDLE)
             db<E100>(WRN) << "CUS_IDLE" << endl;
         else
             db<E100>(WRN) << "Invalid CU status " << endl;
 
         db<E100>(WRN) << "RU = ";
-        if (((status & RUS_MASK) >> RUS_SHIFT) == RUS_READY)
+        if (((stat & RUS_MASK) >> RUS_SHIFT) == RUS_READY)
             db<E100>(WRN) << "RUS_READY" << endl;
-        else if (((status & RUS_MASK) >> RUS_SHIFT) == RUS_NO_RESOURCES)
+        else if (((stat & RUS_MASK) >> RUS_SHIFT) == RUS_NO_RESOURCES)
             db<E100>(WRN) << "RUS_NO_RESOURCES" << endl;
-        else if (((status & RUS_MASK) >> RUS_SHIFT) == RUS_SUSPENDED)
+        else if (((stat & RUS_MASK) >> RUS_SHIFT) == RUS_SUSPENDED)
             db<E100>(WRN) << "RUS_SUSPENDED" << endl;
-        else if (((status & RUS_MASK) >> RUS_SHIFT) == RUS_IDLE)
+        else if (((stat & RUS_MASK) >> RUS_SHIFT) == RUS_IDLE)
             db<E100>(WRN) << "RUS_IDLE" << endl;
         else
             db<E100>(WRN) << "Invalid RU status" << endl;
