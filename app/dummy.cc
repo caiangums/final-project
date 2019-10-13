@@ -37,34 +37,27 @@ public:
         _nic->attach(this, PROTOCOL);
     }
 
-    NIC<Ethernet> * nic() { return _nic; }
-
     const Address & address() { return _nic->address(); }
+    const unsigned int mtu() { return this->MTU; }
 
     int send(const void * data, unsigned int size) {
         return _nic->send(_nic->broadcast(), PROTOCOL, data, size);
     }
 
-    // TODO("Add Address * src and Protocol * prot")
-    // Merging Common_Communicator::receive() with Channel::receive(), ignoring protocol logic
     int receive(Address * src, void * data, unsigned int size) {
-        cout << "Wait for package (receive)" << endl;
-        Buffer * buff = updated();  // lock until the arrival of a packet
-        memcpy(data, buff->frame()->data<char>(), size);  // memcpy(data, packet, size);
+        Buffer * buff = updated();
+        memcpy(data, buff->frame()->data<char>(), size);
         _nic->free(buff);
         return size;
     }
 
     void update(Observed* obs, const Protocol& prot, Buffer* buf) {
-        cout << "Update! Observer, you will be unlocked." << endl;
         Concurrent_Observer<Observer::Observed_Data, Protocol>::update(prot, buf);
     }
 
     static bool notify(const Protocol & prot, Buffer * buf) {
         return _observed.notify(prot, buf);
     }
-
-    const unsigned int mtu() { return this->MTU; }
 
 protected:
     NIC<Ethernet> * _nic;
@@ -94,14 +87,13 @@ int main()
             comm->send(data, DATA_SIZE);
         }
     } else {  // receiver
-        ++self_addr[5];
+        ++self_addr[5];  // my address ends with 08, sender's address with 09.
         DIR_Protocol::Address from = self_addr;
-        cout << "  I'm the receiver " << endl;
-        cout << "  Receive from: " << from << endl;
+        cout << "  Receiving from: " << from << endl;
 
         for(int i = 0; i < 10; i++) {
            comm->receive(&from, data, DATA_SIZE);
-           cout << "  Data: " << data;
+           cout << "  Received data: " << data;
         }
     }
 
