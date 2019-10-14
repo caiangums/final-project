@@ -95,9 +95,9 @@ public:
     } CSR_Desc;
 
     enum port {
-        SOFTWARE_RESET  = 0x0000,
-        SELFTEST        = 0x0001,
-        SELECTIVE_RESET = 0x0002,
+        SOFTWARE_RESET  = 0x00000000,
+        SELFTEST        = 0x00000001,
+        SELECTIVE_RESET = 0x00000002,
     };
 
     /* System Control Block (SCB) */
@@ -612,13 +612,13 @@ protected:
     };
 };
 
-class E100: public NIC<Ethernet>, private IF<Traits<E100>::qemu, i82558a, i82559c>::Result
+class E100: public NIC<Ethernet>, i82558a
 {
     friend class Machine_Common;
 
 private:
     // The E100 engine
-    typedef IF<Traits<E100>::qemu, i82558a, i82559c>::Result Engine;
+    typedef i82558a Engine;
 
     // PCI ID
     static const unsigned int PCI_VENDOR_ID = Engine::PCI_VENDOR_ID;
@@ -681,17 +681,17 @@ private:
     // void i82559_disable_irq() { write8(irq_mask_all, &_csr->scb.cmd_hi); }
     // void i82559_enable_irq() { write8(irq_mask_none, &_csr->scb.cmd_hi); }
 
-    void i82558a_disable_irq() { write8(irq_mask_all, &_csr->scb.cmd); }
-    void i82558a_enable_irq() { write8(irq_mask_none, &_csr->scb.cmd); }
+    void disable_irq() { write16(irq_mask_all, &_csr->scb.cmd); }
+    void enable_irq() { write16(irq_mask_none, &_csr->scb.cmd); }
 
     int self_test();
 
     void software_reset() {
-        write32(SOFTWARE_RESET, &_csr->port);
+        write16(SOFTWARE_RESET, &_csr->port);
         // it should wait for correct accessing the device
         udelay(20 * 1000);
         // disable IRQs
-        i82558a_disable_irq();
+        disable_irq();
         // udelay(1000);
     }
 

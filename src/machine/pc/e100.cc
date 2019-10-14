@@ -191,7 +191,7 @@ void E100::reset()
     macAddrCB->iaaddr = _address;
 
     // i82559_disable_irq();
-    i82558a_disable_irq();
+    disable_irq();
 
     while(exec_command(cuc_start, _configCB_phy));
     udelay(2 * 1000);
@@ -212,7 +212,7 @@ void E100::reset()
     while(exec_command(ruc_start, _rx_ring_phy));
     udelay(10);
 
-    i82558a_enable_irq();
+    enable_irq();
     //i82559_disable_irq();
     udelay(10);
 }
@@ -461,7 +461,7 @@ unsigned short E100::eeprom_read(unsigned short *addr_len, unsigned short addr) 
     unsigned long cmd_addr_data;
     cmd_addr_data = (EE_READ_CMD(*addr_len) | addr) << 16;
 
-    _csr->eeprom_ctrl = eecs | eesk;
+    write16((eecs | eesk), &_csr->eeprom_ctrl);
     // i82559_flush();
     udelay(200);
 
@@ -469,15 +469,16 @@ unsigned short E100::eeprom_read(unsigned short *addr_len, unsigned short addr) 
     unsigned char ctrl;
     for (int i = 31; i >= 0; i--) {
         ctrl = (cmd_addr_data & (1 << i)) ? eecs | eedi : eecs;
-        _csr->eeprom_ctrl = ctrl;
+
+        write16(ctrl, &_csr->eeprom_ctrl);
         // i82559_flush();
         udelay(200);
 
-        _csr->eeprom_ctrl = ctrl | eesk;
+        write16((ctrl | eesk), &_csr->eeprom_ctrl);
         // i82559_flush();
         udelay(200);
 
-        ctrl = _csr->eeprom_ctrl;
+        ctrl = read16(&_csr->eeprom_ctrl);
         if (!(ctrl & eedo) && i > 16) {
             *addr_len -= (i - 16);
             i = 17;
@@ -486,7 +487,8 @@ unsigned short E100::eeprom_read(unsigned short *addr_len, unsigned short addr) 
         data = (data << 1) | (ctrl & eedo ? 1 : 0);
     }
 
-    _csr->eeprom_ctrl = 0;
+
+    write16(0, &_csr->eeprom_ctrl);
     // i82559_flush();
     udelay(200);
 
@@ -670,7 +672,7 @@ int E100::self_test()
     // i82559_flush();
     udelay(20 * 1000); // wait for 10 miliseconds
 
-    i82558a_disable_irq();
+    disable_irq();
 
     // Check results of self-test
     if(dmadump->selftest.result != 0) {
