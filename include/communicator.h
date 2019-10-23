@@ -292,6 +292,66 @@ public:
     const unsigned int MTU        = Ethernet::MTU;
     const unsigned short PROTOCOL = Ethernet::PROTO_DIR;
 
+    class Address
+    {
+    public:
+        typedef unsigned short Port;
+
+    public:
+        Address() {}
+        Address(const Ethernet::Address & mac, const Port port): _mac(mac), _port(port) {}
+
+        const Ethernet::Address & mac() const { return _mac; }
+        const Port port() const { return _port; }
+        const Local local() const { return _port; }
+
+        bool operator==(const Address & a) {
+            return (_mac == a._mac) && (_port == a._port);
+        }
+
+    private:
+        Ethernet::Address _mac;
+        Port _port;
+    };
+
+    class Header
+    {
+    public:
+        typedef unsigned short Code; // codigo de ACK ou outro
+
+        Header() {}
+        Header(const Port from, const Port to, const Code code):
+            _from(from), _to(to), _code(code) {}
+
+        Port from() const { return _from; }
+        Port to() const { return _to; }
+
+    protected:
+        Port _from;
+        Port _to;
+        Code _code;
+    };
+
+    typedef unsigned char Data[MTU];
+
+    class Packet
+    {
+    public:
+        Packet(){}
+        Packet(const Port from, const Port to, const Code code, const Data & data):
+            _header(Header(from, to, code)),
+            _data(data) {}
+
+        Header * header() { return _header; }
+
+        template<typename T>
+        T * data() { return reinterpret_cast<T *>(&_data); }
+
+    private:
+        Header _header;
+        Data _data;
+    }
+
     //template<unsigned int UNIT = 0>  see IP()
     DIR_Protocol(unsigned int nic = 0) :
             _nic(Traits<Ethernet>::DEVICES::Get<0>::Result::get(nic))
