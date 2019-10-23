@@ -304,14 +304,24 @@ public:
 
     // Add parameter port
     int send(const void * data, unsigned int size) {
-        db<Thread>(WRN) << "BLA___SEND" << endl;
-        // build a header with 'port'
         return _nic->send(_nic->broadcast(), PROTOCOL, data, size);
     }
 
+
+    /* Create a semaphore, insert it into a list with the specified port
+     * and then lock the current thread on that semaphore
+     */
+    /*
+    updated() {
+        Semaphore s = new Semaphore(0);
+        _receivers.insert(port, s);
+        s.p();
+        return _list.remove()->object();
+    }
+    */
+
     // Add parameter port
     int receive(Address * src, void * data, unsigned int size) {
-        db<Thread>(WRN) << "BLA___RECEIVE" << endl;
         Buffer * buff = updated();
         memcpy(data, buff->frame()->data<char>(), size);
         _nic->free(buff);
@@ -319,6 +329,15 @@ public:
     }
 
     void update(Observed* obs, const Protocol& prot, Buffer* buf) {
+        // Port p = buf->getHeader()->getPort();
+        // for (r : _receivers) {
+        //   if (r->port() == p) {
+        //     _list.insert(buf->lext());
+        //     r->semaphore().v();
+        //   }
+        // }
+
+        // delete this
         Concurrent_Observer<Observer::Observed_Data, Protocol>::update(prot, buf);
     }
 
@@ -327,6 +346,17 @@ protected:
     Address _address;
     static Observed _observed;
 
+private:
+     class Receiver {
+         const Port _p;
+         Semaphore * _s;
+
+         Receiver(const Port p, const Semaphore * s): _p(p), _s(s) {}
+
+         Simple_List<Receiver>::Element * link() { return this; }
+     }
+
+    Simple_List<Receiver> _receivers;
 };
 
 __END_SYS
