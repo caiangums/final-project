@@ -6,6 +6,7 @@
 #include <network.h>
 #include <machine/nic.h>
 #include <synchronizer.h>
+#include <utility/list.h>
 
 __BEGIN_SYS
 
@@ -284,18 +285,19 @@ class DIR_Protocol:
 public:
     typedef Ethernet::Protocol Protocol;
     typedef Ethernet::Buffer Buffer;
-    typedef Ethernet::Address Address;
     typedef Data_Observer<Buffer, Protocol> Observer;
     typedef Data_Observed<Buffer, Protocol> Observed;
 
+    typedef unsigned short Port;
+
 public:
-    const unsigned int MTU        = Ethernet::MTU;
+    static const unsigned int   MTU      = Ethernet::MTU;
     const unsigned short PROTOCOL = Ethernet::PROTO_DIR;
 
     class Address
     {
     public:
-        typedef unsigned short Port;
+        typedef Port Local;
 
     public:
         Address() {}
@@ -314,10 +316,14 @@ public:
         Port _port;
     };
 
+    typedef unsigned short Code; // codigo de ACK ou outro
+    enum {
+        ACK = 1
+    };
+
     class Header
     {
     public:
-        typedef unsigned short Code; // codigo de ACK ou outro
 
         Header() {}
         Header(const Port from, const Port to, const Code code):
@@ -338,11 +344,10 @@ public:
     {
     public:
         Packet(){}
-        Packet(const Port from, const Port to, const Code code, const Data & data):
-            _header(Header(from, to, code)),
-            _data(data) {}
+        Packet(const Port from, const Port to, const Code code):
+            _header(Header(from, to, code)) {}
 
-        Header * header() { return _header; }
+        Header * header() { return &_header; }
 
         template<typename T>
         T * data() { return reinterpret_cast<T *>(&_data); }
@@ -350,7 +355,7 @@ public:
     private:
         Header _header;
         Data _data;
-    }
+    };
 
     //template<unsigned int UNIT = 0>  see IP()
     DIR_Protocol(unsigned int nic = 0) :
@@ -359,7 +364,7 @@ public:
         _nic->attach(this, PROTOCOL);
     }
 
-    const Address & address() { return _nic->address(); }
+    const Ethernet::Address & address() { return _nic->address(); }
     const unsigned int mtu() { return this->MTU; }
 
     // Add parameter port
@@ -380,8 +385,8 @@ public:
     }
     */
 
-    // Add parameter port
-    int receive(Address * src, void * data, unsigned int size) {
+    // Change Ethernet::Address to Address (which contains the port)
+    int receive(Ethernet::Address * src, void * data, unsigned int size) {
         Buffer * buff = updated();
         memcpy(data, buff->frame()->data<char>(), size);
         _nic->free(buff);
@@ -407,14 +412,21 @@ protected:
     static Observed _observed;
 
 private:
-     class Receiver {
-         const Port _p;
-         Semaphore * _s;
+    class Receiver;
+    typedef Simple_List<Receiver> Receivers;
+    class Receiver
+    {
+    public:
+        const Port _p;
+        const Semaphore * _s;
 
-         Receiver(const Port p, const Semaphore * s): _p(p), _s(s) {}
+        Receiver(const Port p, const Semaphore * s): _p(p), _s(s), _el(this) {}
 
-         Simple_List<Receiver>::Element * link() { return this; }
-     }
+        Receivers::Element * link() { return &_el; }
+
+    private:
+        Receivers::Element _el;
+    };
 
     Simple_List<Receiver> _receivers;
 };
