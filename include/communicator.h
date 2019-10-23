@@ -302,11 +302,16 @@ public:
     const Address & address() { return _nic->address(); }
     const unsigned int mtu() { return this->MTU; }
 
+    // Add parameter port
     int send(const void * data, unsigned int size) {
+        db<Thread>(WRN) << "BLA___SEND" << endl;
+        // build a header with 'port'
         return _nic->send(_nic->broadcast(), PROTOCOL, data, size);
     }
 
+    // Add parameter port
     int receive(Address * src, void * data, unsigned int size) {
+        db<Thread>(WRN) << "BLA___RECEIVE" << endl;
         Buffer * buff = updated();
         memcpy(data, buff->frame()->data<char>(), size);
         _nic->free(buff);
@@ -315,10 +320,6 @@ public:
 
     void update(Observed* obs, const Protocol& prot, Buffer* buf) {
         Concurrent_Observer<Observer::Observed_Data, Protocol>::update(prot, buf);
-    }
-
-    static bool notify(const Protocol & prot, Buffer * buf) {
-        return _observed.notify(prot, buf);
     }
 
 protected:
