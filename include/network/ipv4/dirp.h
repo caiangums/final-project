@@ -15,15 +15,19 @@ class DIRP: private NIC<Ethernet>::Observer
 
 public:
     typedef Ethernet::Protocol Protocol;
+
+    // Buffers received by the NIC, eventually linked into a list
     typedef Ethernet::Buffer Buffer;
+
+    // DIRP and NIC observer/d
     typedef Data_Observer<Buffer, Protocol> Observer;
     typedef Data_Observed<Buffer, Protocol> Observed;
 
     typedef unsigned short Port;
 
-public:
     static const unsigned int MTU      = Ethernet::MTU;
     const unsigned short      PROTOCOL = Ethernet::PROTO_DIR;
+    typedef unsigned char Data[MTU];
 
     class Address  // maybe this could iherit from Ethernet::Address
     {
@@ -32,14 +36,27 @@ public:
 
     public:
         Address() {}
-        Address(const Ethernet::Address & mac, const Port port): _mac(mac), _port(port) {}
+        Address(const Ethernet::Address & mac, const Port port = 0): _mac(mac), _port(port) {}
 
         const Ethernet::Address & mac() const { return _mac; }
         const Port port() const { return _port; }
+        void port(const Port port) { _port = port; }
         const Local local() const { return _port; }
+
+        operator bool() const {
+            return (_mac || _port);
+        }
 
         bool operator==(const Address & a) {
             return (_mac == a._mac) && (_port == a._port);
+        }
+
+        unsigned char & operator[](const size_t i) { return _mac[i]; }
+        const unsigned char & operator[](const size_t i) const { return _mac[i]; }
+
+        friend OStream & operator<<(OStream & db, const Address & a) {
+            db << a._mac << ":" << hex << a._port;
+            return db;
         }
 
     private:
@@ -47,8 +64,8 @@ public:
         Port _port;
     };
 
-    typedef unsigned short Code; // codigo de ACK ou outro
-    enum {
+    enum Code {
+        NOTHING = 0,
         ACK = 1
     };
 
@@ -57,26 +74,26 @@ public:
     public:
 
         Header() {}
-        Header(const Port from, const Port to, const Code code):
-            _from(from), _to(to), _code(code) {}
+        Header(const Port from, const Port to, unsigned int size, const Code code = Code::NOTHING):
+            _from(from), _to(to), _length((size > sizeof(Data) ? sizeof(Data) : size) + sizeof(Header)), _code(code) {}
 
         Port from() const { return _from; }
         Port to() const { return _to; }
+        unsigned short length() const { return _length; }
 
     protected:
         Port _from;
         Port _to;
+        unsigned short _length;   // Length of datagram (header + data) in bytes
         Code _code;
     };
-
-    typedef unsigned char Data[MTU];
 
     class Packet
     {
     public:
         Packet(){}
-        Packet(const Port from, const Port to, const Code code):
-            _header(Header(from, to, code)) {}
+        Packet(const Port from, const Port to, unsigned int size, const Code code = Code::NOTHING):
+            _header(Header(from, to, size, code)) {}
 
         Header * header() { return &_header; }
 
@@ -88,12 +105,27 @@ public:
         Data _data;
     };
 
+    static void init(unsigned int unit) {
+        _networks[unit] = new (SYSTEM) DIRP(unit);
+    }
+
     //template<unsigned int UNIT = 0>  see IP()
-    DIRP(unsigned int nic = 0) :
-            _nic(Traits<Ethernet>::DEVICES::Get<0>::Result::get(nic))
+    DIRP(unsigned int unit = 0) :
+            _nic(Traits<Ethernet>::DEVICES::Get<0>::Result::get(unit)),
+            _address(_nic->address())
     {
         db<Thread>(WRN) << "new DIRP()" << endl;
         _nic->attach(this, PROTOCOL);
+
+        _networks[unit] = this;
+    }
+
+    static DIRP * get_by_nic(unsigned int unit) {
+        if(unit >= Traits<Ethernet>::UNITS) {
+            db<IP>(WRN) << "IP::get_by_nic: requested unit (" << unit << ") does not exist!" << endl;
+            return 0;
+        } else
+            return _networks[unit];
     }
 
     ~DIRP() {
@@ -146,6 +178,7 @@ public:
         return _observed.notify(port, buf);
     }
 
+    NIC<Ethernet>* nic() const { return _nic; }
 
 protected:
     NIC<Ethernet> * _nic;
