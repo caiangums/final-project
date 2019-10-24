@@ -95,6 +95,64 @@ private:
     Local_Address _local;
 };
 
+/*
+// Commonalities for connectionless channels
+class Communicator:
+    protected NIC<Ethernet>::Observer,
+    private Concurrent_Observer<Ethernet::Buffer, Ethernet::Protocol>
+{
+private:
+    typedef typename DIRP::Observer::Observing_Condition Observing_Condition;
+    typedef Concurrent_Observer<typename DIRP::Observer::Observed_Data, typename DIRP::Observer::Observing_Condition> Observer;
+
+public:
+    // List to hold received Buffers
+    typedef typename Ethernet::Buffer Buffer;
+    typedef typename Buffer::List List;
+    typedef typename List::Element Element;
+
+    // Addresses
+    typedef typename DIRP::Address Address;
+    typedef typename DIRP::Address::Local Local_Address;
+
+//protected:
+    Communicator(const Local_Address & local): _local(local) {
+        DIRP::attach(this, local);
+    }
+
+public:
+    ~Communicator() {
+        DIRP::detach(this, _local);
+    }
+
+    int send(const Address & to, const void * data, unsigned int size) {
+        return DIRP::send(_local, to, data, size);
+    }
+
+    int receive(void * data, unsigned int size) {
+        Buffer * buf = updated();
+        return DIRP::receive(buf, data, size);
+    }
+
+    int receive(Address * from, void * data, unsigned int size) {
+        db<Thread>(WRN) << "UPDATED()" << endl;
+        Buffer * buf = updated();
+        db<Thread>(WRN) << "UNLOCKED. RECEIVE()..." << endl;
+        return DIRP::receive(buf, from, data, size);
+    }
+
+private:
+    void update(Observed* obs, const Protocol& prot, Buffer* buf) {
+        Concurrent_Observer<Observer::Observed_Data, Protocol>::update(prot, buf);
+    }
+
+private:
+    Local_Address _local;
+};
+*/
+
+
+
 // Commonalities for connection-oriented channels
 template<typename Channel>
 class Communicator_Common<Channel, false>: protected Channel::Observer, private Concurrent_Observer<typename Channel::Observer::Observed_Data, typename Channel::Observer::Observing_Condition>

@@ -92,6 +92,7 @@ public:
     DIRP(unsigned int nic = 0) :
             _nic(Traits<Ethernet>::DEVICES::Get<0>::Result::get(nic))
     {
+        db<Thread>(WRN) << "new DIRP()" << endl;
         _nic->attach(this, PROTOCOL);
     }
 
@@ -119,7 +120,7 @@ public:
     */
 
     // Change Ethernet::Address to Address (which contains the port)
-    static int receive(Buffer * buf, Ethernet::Address * from, void * data, unsigned int size);
+    static int receive(Buffer * buf, Address * from, void * data, unsigned int size);
         
 
     void update(Observed* obs, const Protocol& prot, Buffer* buf) {
@@ -129,6 +130,7 @@ public:
         // 3. Excecute DIRP::notify() with the current port.
         // 4. Notify find in a list _observers which one has observing condition
         //    equals to the Port obtained in the first step.
+        notify(1111, buf);
     }
 
     /* Since DIRP is a Channel and it is observed, it has to allow observers to attach() and detach() theirselves to it () */
@@ -148,7 +150,9 @@ public:
 protected:
     NIC<Ethernet> * _nic;
     Address _address;
+
     static Observed _observed;
+    static DIRP * _networks[Traits<Ethernet>::UNITS];
 };
 
 __END_SYS

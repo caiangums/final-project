@@ -15,7 +15,7 @@ int DIRP::send(const Address::Local & from, const Address & to, const void * dat
     return nic->send(nic->broadcast(), Ethernet::PROTO_DIR, data, size);
 }
 
-int DIRP::receive(Buffer * buf, Ethernet::Address * from, void * data, unsigned int size) {
+int DIRP::receive(Buffer * buf, Address * from, void * data, unsigned int size) {
     memcpy(data, buf->frame()->data<char>(), size);
     buf->nic()->free(buf);
     return size;
