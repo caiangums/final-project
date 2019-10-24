@@ -138,42 +138,14 @@ public:
 
     static int send(const Address::Local & from, const Address & to, const void * data, unsigned int size);
 
-
-    /* Create a semaphore, insert it into a list with the specified port
-     * and then lock the current thread on that semaphore
-     */
-    /*
-    updated() {
-        Semaphore s = new Semaphore(0);
-        _receivers.insert(port, s);
-        s.p();
-        return _list.remove()->object();
-    }
-    */
-
-    // Change Ethernet::Address to Address (which contains the port)
-    static int receive(Buffer * buf, Address * from, void * data, unsigned int size);
-        
-
-    void update(Observed* obs, const Protocol& prot, Buffer* buf) {
-        // 1. Build a Packet from buf, get the Header, get header->from().
-        // 2. Find in my list _observers which one has observing condition
-        //    equals to the Port obtained in the first step.
-        // 3. Excecute DIRP::notify() with the current port.
-        // 4. Notify find in a list _observers which one has observing condition
-        //    equals to the Port obtained in the first step.
-        notify(1111, buf);
-    }
+    //static int receive(Buffer * buf, Address* from, void * data, unsigned int size);
+    static int receive(Buffer * buf, void * data, unsigned int size);
+    void update(Observed* obs, const Protocol& prot, Buffer* buf);
 
     /* Since DIRP is a Channel and it is observed, it has to allow observers to attach() and detach() theirselves to it () */
     static void attach(Observer * obs, const Port & port) { _observed.attach(obs, port); }
     static void detach(Observer * obs, const Port & port) { _observed.detach(obs, port); }
 
-    // When DIR_Protocol was a communicator, this was not necessary, because
-    // just observeds do notify(), and the communicator was an observer. Now
-    // that DIRP is a Channel, it is an observer of NIC<Ethernet> (just like
-    // before), but it is also an observed (observed by a communicator), so it
-    // does notify(). It will notify their communicators.
     static bool notify(const Port & port, Buffer * buf) {
         return _observed.notify(port, buf);
     }

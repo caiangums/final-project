@@ -27,10 +27,36 @@ int DIRP::send(const Address::Local & from, const Address & to, const void * dat
     return dirp->nic()->send(to.mac(), dirp->PROTOCOL, reinterpret_cast<void *>(packet), sizeof(packet));    
 }
 
-int DIRP::receive(Buffer * buf, Address * from, void * data, unsigned int size) {
-    memcpy(data, buf->frame()->data<char>(), size);
+int DIRP::receive(Buffer * buf, void * d, unsigned int s) {
+    // buf aqui vem do Communicator
+    /*memcpy(data, buf->frame()->data<char>(), size);
     buf->nic()->free(buf);
-    return size;
+    return size;*/
+
+    unsigned char * data = reinterpret_cast<unsigned char *>(d);
+    Packet* packet = buf->frame()->data<Packet>();
+
+    packet = buf->frame()->data<Packet>();
+    unsigned int len = buf->size() - sizeof(Header);
+    memcpy(data, packet->data<void>(), len);
+
+    buf->nic()->free(buf);
+
+    return buf->size();
+}
+
+void DIRP::update(Observed* obs, const Protocol& prot, Buffer* buf) {
+    // buf aqui é o buffer que vem da NIC
+
+    // 1. Build a Packet from buf, get the Header, get header->from().
+    Packet* packet = buf->frame()->data<Packet>();
+
+    Header* header = packet->header();
+    //Buffer* data = packet->data<Buffer>();
+
+    buf->nic(_nic);
+    if(!notify(header->to(), buf))
+        buf->nic()->free(buf);
 }
 
 __END_SYS

@@ -10,6 +10,7 @@ using namespace EPOS;
 OStream cout;
 
 const int DATA_SIZE = 5;
+const int DATA_ITER = 10;
 
 // This is used simply for not to hard coding the MAC address
 NIC<Ethernet> * nic = Traits<Ethernet>::DEVICES::Get<0>::Result::get(0);
@@ -35,7 +36,7 @@ int main()
 
         DIRP::Address dest(self_addr);
         dest[5]--;
-        for(int i = 0; i < 10; i++) {
+        for(int i = 0; i < DATA_ITER; i++) {
             memset(data, '0' + i, DATA_SIZE);
             data[DATA_SIZE - 1] = '\n';
             cout << " Sending: " << data;
@@ -46,13 +47,13 @@ int main()
         /*++self_addr[5];  // my address ends with 08, sender's address with 09.
         DIRP::Address from_mac = self_addr;
         cout << "  Receiving from: " << from_mac << endl;
-
-        comm = new Communicator_Common<DIRP, true>(port);
         DIRP::Address from(from_mac, port);
-        for(int i = 0; i < 10; i++) {
-            comm->receive(&from, &data, DATA_SIZE);
-            cout << "  Received data: " << data;
-        }*/
+        */
+
+        for(int i = 0; i < DATA_ITER; i++) {
+            comm->receive(&data, DATA_SIZE);
+            cout << " Received data: " << data;
+        }
     }
 
     /*
@@ -81,7 +82,7 @@ int dir_receiver() {
     comm = new Communicator_Common<DIRP, true>(port);
     DIRP::Address from(from_mac, port);
     for(int i = 0; i < 10; i++) {
-        comm->receive(&from, &data, DATA_SIZE);
+        //comm->receive(&from, &data, DATA_SIZE);
         cout << "  Received data: " << data;
     }
 
