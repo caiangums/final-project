@@ -23,7 +23,7 @@ public:
     typedef Data_Observer<Buffer, Protocol> Observer;
     typedef Data_Observed<Buffer, Protocol> Observed;
 
-    typedef unsigned short Port;
+    typedef unsigned int Port;
 
     static const unsigned int MTU      = Ethernet::MTU;
     const unsigned short      PROTOCOL = Ethernet::PROTO_DIR;
@@ -36,7 +36,7 @@ public:
 
     public:
         Address() {}
-        Address(const Ethernet::Address & mac, const Port port = 0): _mac(mac), _port(port) {}
+        Address(const Ethernet::Address & mac, const Port port): _mac(mac), _port(port) {}
 
         const Ethernet::Address & mac() const { return _mac; }
         const Port port() const { return _port; }
@@ -58,6 +58,9 @@ public:
             db << a._mac << ":" << hex << a._port;
             return db;
         }
+
+        Ethernet::Address mac() { return _mac; }
+        void mac(Ethernet::Address mac) { _mac = mac; }
 
     private:
         Ethernet::Address _mac;
@@ -111,12 +114,12 @@ public:
 
     //template<unsigned int UNIT = 0>  see IP()
     DIRP(unsigned int unit = 0) :
-            _nic(Traits<Ethernet>::DEVICES::Get<0>::Result::get(unit)),
-            _address(_nic->address())
+            _nic(Traits<Ethernet>::DEVICES::Get<0>::Result::get(unit))
     {
         db<Thread>(WRN) << "new DIRP()" << endl;
         _nic->attach(this, PROTOCOL);
 
+        _address.mac(_nic->address());
         _networks[unit] = this;
     }
 

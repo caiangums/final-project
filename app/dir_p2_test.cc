@@ -12,47 +12,40 @@ OStream cout;
 const int DATA_SIZE = 5;
 const int DATA_ITER = 10;
 
-// This is used simply for not to hard coding the MAC address
-NIC<Ethernet> * nic = Traits<Ethernet>::DEVICES::Get<0>::Result::get(0);
-
-int dir_receiver();
-
 int main()
 {
     cout << "DIRP Test" << endl;
     DIRP::init(0);
-    DIRP* dirp = DIRP::get_by_nic(0);
-    DIRP::Port port = 1111;
-    
-    Communicator_Common<DIRP, true> * comm = new Communicator_Common<DIRP, true>(port);
 
-    DIRP::Address self_addr = dirp->address(); // Application should not access nic, DIRP is responsible for it
+    DIRP::Address self_addr = DIRP::get_by_nic(0)->address();
     cout << "  MAC: " << self_addr << endl;
 
+    Communicator_Common<DIRP, true> * comm;
     char data[DATA_SIZE];
 
-    if(self_addr[5] % 2) {  // sender
+    if (self_addr[5] % 2) {  // sender
         Delay (5000000);
 
-        DIRP::Address dest(self_addr);
-        dest[5]--;
-        for(int i = 0; i < DATA_ITER; i++) {
+        DIRP::Port from_port = 112;
+        DIRP::Port dest_port = from_port;  // could be different from 'port'
+        comm = new Communicator_Common<DIRP, true>(from_port);
+
+        DIRP::Address dest_addr(self_addr.mac(), dest_port);
+
+        dest_addr[5]--;
+        for (int i = 0; i < DATA_ITER; i++) {
             memset(data, '0' + i, DATA_SIZE);
             data[DATA_SIZE - 1] = '\n';
-            cout << " Sending: " << data;
-            comm->send(dest, &data, sizeof(data));
+            cout << "  Sending: " << data;
+            comm->send(dest_addr, &data, sizeof(data));
         }
     } else {  // receiver
-        //new Thread(&dir_receiver);
-        /*++self_addr[5];  // my address ends with 08, sender's address with 09.
-        DIRP::Address from_mac = self_addr;
-        cout << "  Receiving from: " << from_mac << endl;
-        DIRP::Address from(from_mac, port);
-        */
+        DIRP::Port from_port = 112;
+        comm = new Communicator_Common<DIRP, true>(from_port);
 
-        for(int i = 0; i < DATA_ITER; i++) {
+        for (int i = 0; i < DATA_ITER; i++) {
             comm->receive(&data, DATA_SIZE);
-            cout << " Received data: " << data;
+            cout << "  Received data: " << data;
         }
     }
 
@@ -66,6 +59,7 @@ int main()
          */
 }
 
+/*
 int dir_receiver() {
     Communicator_Common<DIRP, true> * comm;
 
@@ -74,7 +68,7 @@ int dir_receiver() {
 
     char data[DATA_SIZE];
 
-    DIRP::Port port = 1111;
+    DIRP::Port port = 111;
     ++self_addr[5];  // my address ends with 08, sender's address with 09.
     Ethernet::Address from_mac = self_addr;
     cout << "  Receiving from: " << from_mac << endl;
@@ -90,3 +84,4 @@ int dir_receiver() {
 
     return 0;
 }
+*/
