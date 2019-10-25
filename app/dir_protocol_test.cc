@@ -17,7 +17,7 @@ int main()
 
     DIR_Protocol * comm = new DIR_Protocol();
 
-    DIR_Protocol::Address self_addr = comm->address();
+    Ethernet::Address self_addr = comm->address();
     cout << "  MAC: " << self_addr << endl;
 
     char data[DATA_SIZE];
@@ -33,7 +33,7 @@ int main()
         }
     } else {  // receiver
         ++self_addr[5];  // my address ends with 08, sender's address with 09.
-        DIR_Protocol::Address from = self_addr;
+        Ethernet::Address from = self_addr;
         cout << "  Receiving from: " << from << endl;
 
         for(int i = 0; i < 10; i++) {

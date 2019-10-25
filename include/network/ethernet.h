@@ -29,7 +29,7 @@ public:
         PROTO_TSTP   = 0x8401,
         PROTO_ELP    = 0x8402,
         PROTO_PTP    = 0x88F7,
-        PROTO_DIR    = 666  // 0x29A
+        PROTO_DIR    = 0x0666
     };
 
     static const unsigned int MTU = 1500;

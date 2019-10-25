@@ -10,6 +10,7 @@
 #include <network/ipv4/ip.h>
 #include <network/ipv4/tcp.h>
 #include <network/ipv4/udp.h>
+#include <network/ipv4/dirp.h>
 #endif
 
 #ifdef __tstp__

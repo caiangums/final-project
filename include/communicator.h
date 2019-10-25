@@ -6,6 +6,7 @@
 #include <network.h>
 #include <machine/nic.h>
 #include <synchronizer.h>
+#include <utility/list.h>
 
 __BEGIN_SYS
 
@@ -29,7 +30,7 @@ public:
     typedef typename Channel::Address Address;
     typedef typename Channel::Address::Local Local_Address;
 
-protected:
+//protected:
     Communicator_Common(const Local_Address & local): _local(local) {
         Channel::attach(this, local);
     }
@@ -93,6 +94,64 @@ private:
 private:
     Local_Address _local;
 };
+
+/*
+// Commonalities for connectionless channels
+class Communicator:
+    protected NIC<Ethernet>::Observer,
+    private Concurrent_Observer<Ethernet::Buffer, Ethernet::Protocol>
+{
+private:
+    typedef typename DIRP::Observer::Observing_Condition Observing_Condition;
+    typedef Concurrent_Observer<typename DIRP::Observer::Observed_Data, typename DIRP::Observer::Observing_Condition> Observer;
+
+public:
+    // List to hold received Buffers
+    typedef typename Ethernet::Buffer Buffer;
+    typedef typename Buffer::List List;
+    typedef typename List::Element Element;
+
+    // Addresses
+    typedef typename DIRP::Address Address;
+    typedef typename DIRP::Address::Local Local_Address;
+
+//protected:
+    Communicator(const Local_Address & local): _local(local) {
+        DIRP::attach(this, local);
+    }
+
+public:
+    ~Communicator() {
+        DIRP::detach(this, _local);
+    }
+
+    int send(const Address & to, const void * data, unsigned int size) {
+        return DIRP::send(_local, to, data, size);
+    }
+
+    int receive(void * data, unsigned int size) {
+        Buffer * buf = updated();
+        return DIRP::receive(buf, data, size);
+    }
+
+    int receive(Address * from, void * data, unsigned int size) {
+        db<Thread>(WRN) << "UPDATED()" << endl;
+        Buffer * buf = updated();
+        db<Thread>(WRN) << "UNLOCKED. RECEIVE()..." << endl;
+        return DIRP::receive(buf, from, data, size);
+    }
+
+private:
+    void update(Observed* obs, const Protocol& prot, Buffer* buf) {
+        Concurrent_Observer<Observer::Observed_Data, Protocol>::update(prot, buf);
+    }
+
+private:
+    Local_Address _local;
+};
+*/
+
+
 
 // Commonalities for connection-oriented channels
 template<typename Channel>
@@ -273,6 +332,7 @@ public:
     Link<Channel> * connect(const Address & to) { return new (SYSTEM) Link<Channel>(Channel::connect(this->_local, to)); }
 };
 
+
 // A simple abstraction for connectionless channels, that simply forwards data
 // from the application to the next lower level. DIR_Protocol is responsible for
 // decoupling the application from the network communication.
@@ -284,13 +344,77 @@ class DIR_Protocol:
 public:
     typedef Ethernet::Protocol Protocol;
     typedef Ethernet::Buffer Buffer;
-    typedef Ethernet::Address Address;
     typedef Data_Observer<Buffer, Protocol> Observer;
     typedef Data_Observed<Buffer, Protocol> Observed;
 
+    typedef unsigned short Port;
+
 public:
-    const unsigned int MTU        = Ethernet::MTU;
+    static const unsigned int   MTU      = Ethernet::MTU;
     const unsigned short PROTOCOL = Ethernet::PROTO_DIR;
+
+    class Address
+    {
+    public:
+        typedef Port Local;
+
+    public:
+        Address() {}
+        Address(const Ethernet::Address & mac, const Port port): _mac(mac), _port(port) {}
+
+        const Ethernet::Address & mac() const { return _mac; }
+        const Port port() const { return _port; }
+        const Local local() const { return _port; }
+
+        bool operator==(const Address & a) {
+            return (_mac == a._mac) && (_port == a._port);
+        }
+
+    private:
+        Ethernet::Address _mac;
+        Port _port;
+    };
+
+    typedef unsigned short Code; // codigo de ACK ou outro
+    enum {
+        ACK = 1
+    };
+
+    class Header
+    {
+    public:
+
+        Header() {}
+        Header(const Port from, const Port to, const Code code):
+            _from(from), _to(to), _code(code) {}
+
+        Port from() const { return _from; }
+        Port to() const { return _to; }
+
+    protected:
+        Port _from;
+        Port _to;
+        Code _code;
+    };
+
+    typedef unsigned char Data[MTU];
+
+    class Packet
+    {
+    public:
+        Packet(){}
+        Packet(const Port from, const Port to, const Code code):
+            _header(Header(from, to, code)) {}
+
+        Header * header() { return &_header; }
+
+        template<typename T>
+        T * data() { return reinterpret_cast<T *>(&_data); }
+
+    private:
+        Header _header;
+        Data _data;
+    };
 
     //template<unsigned int UNIT = 0>  see IP()
     DIR_Protocol(unsigned int nic = 0) :
@@ -299,14 +423,29 @@ public:
         _nic->attach(this, PROTOCOL);
     }
 
-    const Address & address() { return _nic->address(); }
+    const Ethernet::Address & address() { return _nic->address(); }
     const unsigned int mtu() { return this->MTU; }
 
+    // Add parameter port
     int send(const void * data, unsigned int size) {
         return _nic->send(_nic->broadcast(), PROTOCOL, data, size);
     }
 
-    int receive(Address * src, void * data, unsigned int size) {
+
+    /* Create a semaphore, insert it into a list with the specified port
+     * and then lock the current thread on that semaphore
+     */
+    /*
+    updated() {
+        Semaphore s = new Semaphore(0);
+        _receivers.insert(port, s);
+        s.p();
+        return _list.remove()->object();
+    }
+    */
+
+    // Change Ethernet::Address to Address (which contains the port)
+    int receive(Ethernet::Address * src, void * data, unsigned int size) {
         Buffer * buff = updated();
         memcpy(data, buff->frame()->data<char>(), size);
         _nic->free(buff);
@@ -314,11 +453,16 @@ public:
     }
 
     void update(Observed* obs, const Protocol& prot, Buffer* buf) {
-        Concurrent_Observer<Observer::Observed_Data, Protocol>::update(prot, buf);
-    }
+        // Port p = buf->getHeader()->getPort();
+        // for (r : _receivers) {
+        //   if (r->port() == p) {
+        //     _list.insert(buf->lext());
+        //     r->semaphore().v();
+        //   }
+        // }
 
-    static bool notify(const Protocol & prot, Buffer * buf) {
-        return _observed.notify(prot, buf);
+        // delete this
+        Concurrent_Observer<Observer::Observed_Data, Protocol>::update(prot, buf);
     }
 
 protected:
@@ -326,6 +470,24 @@ protected:
     Address _address;
     static Observed _observed;
 
+private:
+    class Receiver;
+    typedef Simple_List<Receiver> Receivers;
+    class Receiver
+    {
+    public:
+        const Port _p;
+        const Semaphore * _s;
+
+        Receiver(const Port p, const Semaphore * s): _p(p), _s(s), _el(this) {}
+
+        Receivers::Element * link() { return &_el; }
+
+    private:
+        Receivers::Element _el;
+    };
+
+    Simple_List<Receiver> _receivers;
 };
 
 __END_SYS
