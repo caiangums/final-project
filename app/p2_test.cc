@@ -16,7 +16,6 @@ char data[DATA_SIZE];
 DIRP::Address self_addr;
 Communicator_Common<DIRP, true> * comm;
 
-
 int sender();
 int receiver();
 
@@ -44,6 +43,7 @@ int sender()
     DIRP::Port from_port = 112;
     DIRP::Port dest_port = from_port;  // could be different from 'port'
     comm = new Communicator_Common<DIRP, true>(from_port);
+    cout << "  Send to port " << dest_port << data << endl;
 
     DIRP::Address dest_addr(self_addr.mac(), dest_port);
 
@@ -58,33 +58,13 @@ int sender()
 
 int receiver()
 {
-    DIRP::Port from_port = 112;
+    DIRP::Port from_port = 112;  // listen this port
     comm = new Communicator_Common<DIRP, true>(from_port);
+    cout << "  Listening port " << from_port << data << endl;
 
     for (int i = 0; i < DATA_ITER; i++) {
         comm->receive(&data, DATA_SIZE);
         cout << "  Received data: " << data;
     }
 }
-/*
-    Ethernet::Address self_addr = nic->address();
-    cout << "  MAC: " << self_addr << endl;
 
-    char data[DATA_SIZE];
-
-    DIRP::Port port = 111;
-    ++self_addr[5];  // my address ends with 08, sender's address with 09.
-    Ethernet::Address from_mac = self_addr;
-    cout << "  Receiving from: " << from_mac << endl;
-
-    comm = new Communicator_Common<DIRP, true>(port);
-    DIRP::Address from(from_mac, port);
-    for(int i = 0; i < 10; i++) {
-        //comm->receive(&from, &data, DATA_SIZE);
-        cout << "  Received data: " << data;
-    }
-
-    delete comm;
-
-    return 0;
-    */
