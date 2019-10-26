@@ -22,8 +22,7 @@ int DIRP::send(const Address::Local & from, const Address & to, const void * dat
     memcpy(packet, &port, 4);
     memcpy(&packet[4], data, size);
 
-    // TODOr get the second param (protocol) properly
-    return dirp->nic()->send(to.mac(), 0x0666, reinterpret_cast<void *>(packet), sizeof(packet));
+    return dirp->nic()->send(to.mac(), Ethernet::PROTO_DIRP, reinterpret_cast<void *>(packet), sizeof(packet));
 }
 
 // TODOr use abstractions like Packet and Header

@@ -26,7 +26,7 @@ public:
     typedef unsigned int Port;
 
     static const unsigned int MTU      = Ethernet::MTU;
-    const unsigned short      PROTOCOL = Ethernet::PROTO_DIR;
+    const unsigned short      PROTOCOL = Ethernet::PROTO_DIRP;
     typedef unsigned char Data[MTU];
 
     class Address  // maybe this could iherit from Ethernet::Address
