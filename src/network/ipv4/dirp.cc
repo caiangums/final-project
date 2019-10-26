@@ -11,16 +11,27 @@ __BEGIN_SYS
 DIRP::Observed DIRP::_observed;
 DIRP* DIRP::_networks[];
 
+// TODOr after make it work, try to use sizeof(Address) instead of Address::Local + Ethernet::Address
+
+
 // TODOr use abstractions like Packet and Header
 int DIRP::send(const Address::Local & from, const Address & to, const void * data, unsigned int size) {
     // Get singleton DIRP
     DIRP * dirp = DIRP::get_by_nic(0);
-    
-    // our packet is the data to be sent plus the destin port (an unsigned int, 4 bytes) in the front
-    char packet[size + 4];
+
     unsigned int port = to.port();
-    memcpy(packet, &port, 4);
-    memcpy(&packet[4], data, size);
+    Ethernet::Address mac_addr = dirp->address().mac();
+    db<DIRP>(WRN) << "SENDING: MAC "<< mac_addr << endl;
+
+    unsigned int port_size = 4; //sizeof(to.port());
+    unsigned int mac_size = 6; //sizeof(Ethernet::Address);
+
+    // our packet is the data to be sent plus the destin port (an unsigned int, 4 bytes) in the front
+    char packet[size + port_size + mac_size];
+
+    memcpy(packet, &port, port_size);  // add port in the front
+    memcpy(&packet[port_size], &mac_addr, mac_size);  // add MAC after port
+    memcpy(&packet[port_size + mac_size], data, size);  // add data
 
     return dirp->nic()->send(to.mac(), Ethernet::PROTO_DIRP, reinterpret_cast<void *>(packet), sizeof(packet));
 }
@@ -29,19 +40,38 @@ int DIRP::send(const Address::Local & from, const Address & to, const void * dat
 int DIRP::receive(Buffer * buf, void * d, unsigned int s) {
     // buf aqui vem do Communicator
     char * data = buf->frame()->data<char>();
-    memcpy(d, &(data[4]), s);  // 4 bytes is the port length (unsigned int)
+    db<DIRP>(WRN) << "Tamanho recebido: " << sizeof(data) << endl;
+
+    unsigned int port_size = 4;//sizeof(Address::Local);
+    unsigned int mac_size = 6;//sizeof(Ethernet::Address);
+    unsigned int header_size = port_size + mac_size;
+
+    // get mac address
+    char mac_addr[6];
+    memcpy(mac_addr, &(data[port_size]), mac_size);  // n bytes is the port length
+    db<DIRP>(WRN) << "RECEIVING: MAC ADDR "<< mac_addr << endl;
+    Ethernet::Address mac(mac_addr);
+    db<DIRP>(WRN) << "RECEIVING: MAC "<< mac << endl;
+
+    memcpy(d, &(data[header_size]), s);  // n bytes is the port length
     buf->nic()->free(buf);
+
     return s;
 }
 
 // TODOr use abstractions like Packet and Header
 void DIRP::update(Observed* obs, const Protocol& prot, Buffer* buf) {
-    char data[9];  // TODOr 9 is hardcoded: DATA_SIZE from main() + 4 (unsigned int)
-    memcpy(data, buf->frame()->data<char>(), 9);
+    // TODOr 5 is: DATA_SIZE from main()
+    unsigned int size = 5 + 4 + 6;//sizeof(Ethernet::Address);
+    char data[size];
 
+    memcpy(data, buf->frame()->data<char>(), size);
+
+    // TODOr: remember that if we are getting 1 byte here, the DIRP port is limited to 127.
     // the first byte of data represents an unsigned int, not a char
     unsigned int port = (unsigned int)((unsigned char)(data[0]));
 
+    db<DIRP>(WRN) << "Tamanho recebido: " << sizeof(buf) << endl;
     buf->nic(_nic);
     if(!notify(port, buf))
         buf->nic()->free(buf);
