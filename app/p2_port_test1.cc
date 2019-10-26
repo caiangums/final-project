@@ -16,12 +16,13 @@ char data[DATA_SIZE];
 DIRP::Address self_addr;
 Communicator_Common<DIRP, true> * comm;
 
+
 int sender(int p)
 {
     DIRP::Port from_port = (unsigned int) p;
     DIRP::Port dest_port = from_port;  // could be different from 'port'
     comm = new Communicator_Common<DIRP, true>(from_port);
-    cout << "  Send to port " << dest_port << data << endl;
+    cout << "\n  Send to port " << dest_port << data << endl;
 
     DIRP::Address dest_addr(self_addr.mac(), dest_port);
 
@@ -40,7 +41,7 @@ int receiver(int p)
 {
     DIRP::Port from_port = (unsigned int) p;  // listen this port
     comm = new Communicator_Common<DIRP, true>(from_port);
-    cout << "  Listening port " << from_port << data << endl;
+    cout << "\n  Listening port " << from_port << data << endl;
 
     for (int i = 0; i < DATA_ITER; i++) {
         comm->receive(&data, DATA_SIZE);
@@ -61,12 +62,20 @@ int main()
 
     if (self_addr[5] % 2) {  // sender
         Delay (5000000);
-        new Thread(&sender, 10);
-        new Thread(&sender, 0);
+        sender(1);
+
+        Delay (5000000);
+        sender(1);
     } else {  // receiver
-        new Thread(&receiver, 0);
-        new Thread(&receiver, 10);
+
+        // Test 1: receive everything from s1
+        receiver(1);
+
+        // Test 2: doesn't receive anything, because sender sent to port 1
+        receiver(10);
     }
+
+    delete comm;
 
     return 0;
 }
