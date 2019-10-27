@@ -90,12 +90,13 @@ int DIRP::send(const Address::Local & from, const Address & to, const void * dat
     dirp->nic()->send(to.mac(), dirp->PROTOCOL, reinterpret_cast<void *>(packet), sizeof(packet));
 
     // creates handler to resend message
+    bool timeout = false;
     int retries = Traits<Network>::RETRIES;
-    DIRP::DIRP_Sender dirp_sender(to, dirp, reinterpret_cast<void *>(packet), sizeof(packet));
+    DIRP::DIRP_Sender dirp_sender(&timeout, from, to, dirp, reinterpret_cast<void *>(packet), sizeof(packet), retries);
     dirp->_handler = new Functor_Handler<DIRP::DIRP_Sender>(&(DIRP::retry_send), &dirp_sender);
 
     // creates alarm that resend the message in case of no ACK received
-    dirp->_alarm = new Alarm((DELAY_SECONDS * (int)Traits<Network>::TIMEOUT/3), dirp->_handler, retries);
+    dirp->_alarm = new Alarm((DELAY_SECONDS * (int)Traits<Network>::TIMEOUT/3), dirp->_handler, retries + 1);
 
     // wait for ACK
     Buffer* buf = _observed.notified(from);
@@ -109,7 +110,8 @@ int DIRP::send(const Address::Local & from, const Address & to, const void * dat
     * Quando o alarme der Timeout (caso em que buffer é nulo)
     * Quando chegar um ACK, e o update() libera normalmente.
     */
-    if (buf == nullptr) {
+    if (buf == nullptr || timeout) {
+        db<DIRP>(WRN) << "DIRP::update() - timeout or null buffer!" << endl;
         return -1;
     }
     //delete retries;

@@ -115,21 +115,30 @@ public:
 
     class DIRP_Sender {
     public:
-        DIRP_Sender(const Address & to, DIRP * dirp, void * data, int size):
-            _to(to), _dirp(dirp), _data(data), _size(size) {}
+        DIRP_Sender(bool * timeout, const Address::Local & from, const Address & to, DIRP * dirp, void * data, int size, int retries):
+            _timeout(timeout), _from(from), _to(to), _dirp(dirp), _data(data), _size(size), _retries(retries) {}
         ~DIRP_Sender() {}
 
         void resend() {
             // in order to see this function called, uncomment this line
-            db<DIRP_Sender>(WRN) << "DIRP_Sender::send()" << endl;
+            db<DIRP_Sender>(WRN) << "DIRP_Sender::resend()" << endl;
+            if (this->_retries == 0) {
+                *(this->_timeout) = true;
+                this->_dirp->notify(this->_from, nullptr);
+                return;
+            }
+            this->_retries -= 1;
             this->_dirp->nic()->send(this->_to.mac(), this->_dirp->PROTOCOL, this->_data, this->_size);
         }
 
     private:
+        bool * _timeout;
+        const Address::Local _from;
         const Address _to;
         DIRP * _dirp;
         void * _data;
         int _size;
+        int _retries;
     };
 
     //template<unsigned int UNIT = 0>  see IP()

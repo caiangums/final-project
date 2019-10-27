@@ -36,7 +36,7 @@ int sender(int p)
         mutex.unlock();
         comm->send(dest_addr, &data, sizeof(data));
         // uncomment for see the messages from DIRP_Sender
-        Alarm::delay(3000000);
+        Alarm::delay(1000000);
     }
 
     return 0;
@@ -69,10 +69,10 @@ int main()
 
     if (self_addr[5] % 2) {  // sender
         Delay (5000000);
-        // sender(1);
-        sender(10);
+        sender(1);
+        // sender(2);
     } else {  // receiver
-        new Thread(&receiver, 1);
+        new Thread(&receiver, 2);
     }
 
     delete comm;
