@@ -14,57 +14,6 @@ DIRP* DIRP::_networks[];
 
 static const int DELAY_SECONDS = 1000000;
 
-/* Alarm_Object class to be passed as an argument to Functor_Handler of Alarm,
- * eventually make some changes or even destroy the object.
- */
-class Alarm_Object {
-    public:
-        Alarm_Object(const void* data, int retries):
-            _retries(retries), _data(data) {}
-        ~Alarm_Object() {}
-
-        // get
-        int retries() { return this->_retries; }
-
-        // set
-        void retries(int retries) { this->_retries = retries; }
-
-    private:
-        int _retries;
-        const void* _data;
-
-};
-
-/* This is the function that is called by the Functor_Handler, passing
- * the alarm_object as parameter
- */
-void function_handler_to_functor(Alarm_Object * obj) {
-    // Change something inside the object
-    int v = obj->retries() + 1;
-    obj->retries(v);
-    db<DIRP>(ERR) << "    function_handler_to_functor call with retries=(" << obj->retries() << ")" << endl;
-}
-
-// Alarm with a Functor_Handler
-Alarm* alarm_with_functor(const void * data) {
-    db<DIRP>(ERR) << "  Alarm() with Functor_Handler - start" << endl;
-
-    // create the Test Object
-    int retries = Traits<Network>::RETRIES;
-    Alarm_Object alarm_object(data, retries);
-
-    // Create the Functor_Handler object, defined in handler.h
-    Functor_Handler<Alarm_Object> handler(&function_handler_to_functor, &alarm_object);
-
-    db<DIRP>(ERR) << "  create the alarm with 1s of delay, 3 times" << endl;
-
-    // Create the Alarm object with time and the Function_Handler
-    Alarm* alarm = new Alarm(DELAY_SECONDS * (int)Traits<Network>::TIMEOUT/3, &handler, retries);
-
-    db<DIRP>(ERR) << "  Alarm() with Functor_Handler - end" << endl;
-    return alarm;
-}
-
 // TODOr use abstractions like Packet and Header
 int DIRP::send(const Address::Local & from, const Address & to, const void * data, unsigned int size) {
     // Get singleton DIRP
