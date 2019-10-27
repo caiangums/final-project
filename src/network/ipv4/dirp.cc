@@ -122,17 +122,16 @@ int DIRP::receive(Buffer * buf, void * d, unsigned int s) {
         char port[port_size];
         memcpy(port, data, port_size);
         // get mac address
-        char mac_addr[mac_size];
-        memcpy(mac_addr, &data[port_size], mac_size);  // n bytes is the port length
+        Ethernet::Address mac_addr;
+        memcpy(&mac_addr, &data[port_size], mac_size);  // n bytes is the port length
 
-        Ethernet::Address mac(mac_addr);
         char packet[port_size + mac_size + ack_size];
         Code ack = Code::ACK;
 
         memcpy(packet, &port, port_size);  // add port
         memcpy(&packet[port_size], &mac_addr, mac_size);  // add MAC after port
         memcpy(&packet[port_size + mac_size], &ack, ack_size);  // add ACK after MAC
-        dirp->nic()->send(mac, dirp->PROTOCOL, reinterpret_cast<void *>(packet), sizeof(packet));
+        dirp->nic()->send(mac_addr, dirp->PROTOCOL, reinterpret_cast<void *>(packet), sizeof(packet));
     //}
 
     memcpy(d, &(data[header_size]), s);  // n bytes is the port length
