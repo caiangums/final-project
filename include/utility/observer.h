@@ -227,6 +227,16 @@ public:
         return notified;
     }
 
+    virtual D * notified(const C& c) {
+        for(Element * e = _observers.head(); e; e = e->next()) {
+            if(e->rank() == c) {
+                db<Observeds>(INF) << "Data_Observed::notified(this=" << this << ",obs=" << e->object() << ")" << endl;
+                return e->object()->updated();
+            }
+        }
+        return nullptr;
+    }
+
     virtual _Observer * observer(const C & c, unsigned int index = 0) {
         _Observer * o = 0;
         for(Element * e = _observers.head(); e; e = e->next()) {
@@ -264,6 +274,7 @@ public:
     }
 
     virtual void update(Data_Observed<D, C> * o, const C & c, D * d) = 0;
+    virtual D * updated() { return nullptr; }
 
 private:
     typename Data_Observed<D, C>::Element _link;

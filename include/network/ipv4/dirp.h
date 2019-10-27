@@ -153,6 +153,10 @@ public:
         return _observed.notify(port, buf);
     }
 
+    static bool notified(const Port & port) {
+        return _observed.notified(port);
+    }
+
     NIC<Ethernet>* nic() const { return _nic; }
 
 protected:
