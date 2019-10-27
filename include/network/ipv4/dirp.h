@@ -6,6 +6,7 @@
 #ifdef __ipv4__
 
 #include <machine/nic.h>
+#include <synchronizer.h>
 
 __BEGIN_SYS
 
@@ -112,6 +113,25 @@ public:
         _networks[unit] = new (SYSTEM) DIRP(unit);
     }
 
+    class DIRP_Sender {
+    public:
+        DIRP_Sender(const Address & to, DIRP * dirp, void * data, int size):
+            _to(to), _dirp(dirp), _data(data), _size(size) {}
+        ~DIRP_Sender() {}
+
+        void resend() {
+            // in order to see this function called, uncomment this line
+            db<DIRP_Sender>(WRN) << "DIRP_Sender::send()" << endl;
+            this->_dirp->nic()->send(this->_to.mac(), this->_dirp->PROTOCOL, this->_data, this->_size);
+        }
+
+    private:
+        const Address _to;
+        DIRP * _dirp;
+        void * _data;
+        int _size;
+    };
+
     //template<unsigned int UNIT = 0>  see IP()
     DIRP(unsigned int unit = 0) :
             _nic(Traits<Ethernet>::DEVICES::Get<0>::Result::get(unit))
@@ -160,8 +180,14 @@ public:
     NIC<Ethernet>* nic() const { return _nic; }
 
 protected:
+    static void retry_send(DIRP_Sender * dirp_sender) {
+        dirp_sender->resend();
+    }
+
     NIC<Ethernet> * _nic;
     Address _address;
+    Functor_Handler<DIRP_Sender> * _handler;
+    Alarm * _alarm;
 
     static Observed _observed;
     static DIRP * _networks[Traits<Ethernet>::UNITS];

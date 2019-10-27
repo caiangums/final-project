@@ -89,8 +89,21 @@ int DIRP::send(const Address::Local & from, const Address & to, const void * dat
     memcpy(&packet[port_size + mac_size + ack_size], data, size); // add data after ACK
     dirp->nic()->send(to.mac(), dirp->PROTOCOL, reinterpret_cast<void *>(packet), sizeof(packet));
 
-    //Alarm* retries = alarm_with_functor(data);
+    // creates handler to resend message
+    int retries = Traits<Network>::RETRIES;
+    DIRP::DIRP_Sender dirp_sender(to, dirp, reinterpret_cast<void *>(packet), sizeof(packet));
+    dirp->_handler = new Functor_Handler<DIRP::DIRP_Sender>(&(DIRP::retry_send), &dirp_sender);
+
+    // creates alarm that resend the message in case of no ACK received
+    dirp->_alarm = new Alarm((DELAY_SECONDS * (int)Traits<Network>::TIMEOUT/3), dirp->_handler, retries);
+
+    // wait for ACK
     Buffer* buf = _observed.notified(from);
+
+    // cleanup alarm and handler
+    delete dirp->_alarm;
+    delete dirp->_handler;
+
     /*
     * Pode chegar nesse ponto em dois casos:
     * Quando o alarme der Timeout (caso em que buffer é nulo)
