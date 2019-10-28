@@ -40,7 +40,7 @@ int main()
 
 int sender()
 {
-    DIRP::Port from_port = 112;
+    DIRP::Port from_port = 1111;
     DIRP::Port dest_port = from_port;  // could be different from 'port'
     comm = new Communicator_Common<DIRP, true>(from_port);
     cout << "  Send to port " << dest_port << data << endl;
@@ -58,7 +58,7 @@ int sender()
 
 int receiver()
 {
-    DIRP::Port from_port = 112;  // listen this port
+    DIRP::Port from_port = 1111;  // listen this port
     comm = new Communicator_Common<DIRP, true>(from_port);
     cout << "  Listening port " << from_port << data << endl;
 

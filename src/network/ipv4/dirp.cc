@@ -20,14 +20,12 @@ int DIRP::send(const Address::Local & from, const Address & to, const void * dat
     // Get singleton DIRP
     DIRP * dirp = DIRP::get_by_nic(0);
 
-    unsigned int port = to.port();
+    unsigned short port = to.port();
     Ethernet::Address mac_addr = dirp->address().mac();
 
     unsigned int port_size = sizeof(Address::Local);
     unsigned int mac_size = sizeof(Ethernet::Address);
     unsigned int ack_size = sizeof(Code);
-
-    // our packet is the data to be sent plus the destin port (an unsigned int, 4 bytes) in the front
     char packet[size + port_size + mac_size + ack_size];
 
     Code noack = Code::NOTHING;
@@ -38,7 +36,7 @@ int DIRP::send(const Address::Local & from, const Address & to, const void * dat
     memcpy(&packet[port_size + mac_size + ack_size], data, size); // add data after ACK
     dirp->nic()->send(to.mac(), dirp->PROTOCOL, reinterpret_cast<void *>(packet), sizeof(packet));
 
-    // creates handler to resend message
+    // Retransmission: creates handler to resend message
     bool timed_out = false;
     int retries = Traits<Network>::RETRIES;
     int timeout = Traits<Network>::TIMEOUT;
@@ -94,7 +92,10 @@ void DIRP::update(Observed* obs, const Protocol& prot, Buffer* buf)
 
     // TODOr: remember that if we are getting 1 byte here, the DIRP port is limited to 127.
     // the first byte of data represents an unsigned int, not a char
-    unsigned int port = (unsigned int)((unsigned char)(data[0]));
+    unsigned short port = (unsigned short)((unsigned char)(data[3])) << 24
+                        | (unsigned short)((unsigned char)(data[2])) << 16
+                        | (unsigned short)((unsigned char)(data[1])) << 8
+                        | (unsigned short)((unsigned char)(data[0]));
 
     buf->nic(_nic);
     if(!notify(port, buf))
@@ -103,18 +104,19 @@ void DIRP::update(Observed* obs, const Protocol& prot, Buffer* buf)
 
 void DIRP::acknowledged(char * data)
 {
-    unsigned int port_size = 4;//sizeof(Address::Local);
-    unsigned int mac_size = 6;//sizeof(Ethernet::Address);
+    unsigned int port_size = sizeof(Address::Local);
+    unsigned int mac_size = sizeof(Ethernet::Address);
     unsigned int ack_size = sizeof(Code);
+    char packet[port_size + mac_size + ack_size];
 
     // get port
     char port[port_size];
     memcpy(port, data, port_size);
+
     // get mac address
     Ethernet::Address mac_addr;
-    memcpy(&mac_addr, &data[port_size], mac_size);  // n bytes is the port length
+    memcpy(&mac_addr, &data[port_size], mac_size);
 
-    char packet[port_size + mac_size + ack_size];
     Code ack = Code::ACK;
 
     memcpy(packet, &port, port_size);  // add port

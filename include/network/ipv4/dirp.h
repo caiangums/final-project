@@ -24,7 +24,7 @@ public:
     typedef Data_Observer<Buffer, Protocol> Observer;
     typedef Data_Observed<Buffer, Protocol> Observed;
 
-    typedef unsigned int Port;
+    typedef unsigned short Port;
 
     static const unsigned int MTU      = Ethernet::MTU;
     const unsigned short      PROTOCOL = Ethernet::PROTO_DIRP;
