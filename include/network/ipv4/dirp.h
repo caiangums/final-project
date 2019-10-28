@@ -135,7 +135,7 @@ public:
                 return;
             }
             _retries--;
-            _dirp->nic()->send(header->to().mac(), _dirp->PROTOCOL, _packet.data<char>(), _size);
+            _dirp->nic()->send(header->to().mac(), _dirp->PROTOCOL, reinterpret_cast<void *>(&_packet), _size);
         }
 
     private:

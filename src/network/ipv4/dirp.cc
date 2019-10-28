@@ -101,7 +101,7 @@ void DIRP::acknowledged(Packet * pkt)
 
     Delay (1000000);
     DIRP* dirp = get_by_nic(0);
-    dirp->nic()->send(self.mac(), dirp->PROTOCOL, reinterpret_cast<void *>(&packet), sizeof(packet));
+    dirp->nic()->send(h->from().mac(), dirp->PROTOCOL, reinterpret_cast<void *>(&packet), sizeof(packet));
 }
 
 
