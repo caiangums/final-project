@@ -122,26 +122,25 @@ public:
     class DIRP_Sender
     {
     public:
-        DIRP_Sender(const Address::Local & from, const Address & to, void * data, int size, DIRP * dirp, bool * timeout, int retries):
-            _from(from), _to(to), _data(data), _size(size), _dirp(dirp), _timeout(timeout), _retries(retries) {}
+        DIRP_Sender(const Packet packet, const unsigned int size, DIRP * dirp, bool * timeout, int retries):
+            _packet(packet), _size(size), _dirp(dirp), _timeout(timeout), _retries(retries) {}
         ~DIRP_Sender() {}
 
         void resend() {
             db<DIRP_Sender>(WRN) << "DIRP_Sender::resend()" << endl;
+            Header * header = _packet.header();
             if (_retries == 0) {
                 *(_timeout) = true;
-                _dirp->notify(_from, nullptr);
+                _dirp->notify(header->from().port(), nullptr);
                 return;
             }
             _retries--;
-            _dirp->nic()->send(_to.mac(), _dirp->PROTOCOL, _data, _size);
+            _dirp->nic()->send(header->to().mac(), _dirp->PROTOCOL, _packet.data<char>(), _size);
         }
 
     private:
-        const Address::Local _from;
-        const Address _to;
-        void * _data;
-        int _size;
+        Packet _packet;
+        unsigned int _size;
         DIRP * _dirp;
         bool * _timeout;
         int _retries;
@@ -196,7 +195,7 @@ protected:
         dirp_sender->resend();
     }
 
-    static void acknowledged(char * data);
+    static void acknowledged(Packet * pkt);
 
     NIC<Ethernet> * _nic;
     Address _address;
