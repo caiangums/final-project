@@ -30,7 +30,7 @@ public:
     const unsigned short      PROTOCOL = Ethernet::PROTO_DIRP;
     typedef unsigned char Data[MTU];
 
-    class Address  // maybe this could iherit from Ethernet::Address
+    class Address
     {
     public:
         typedef Port Local;
@@ -66,7 +66,7 @@ public:
     private:
         Ethernet::Address _mac;
         Port _port;
-    };
+    }__attribute__((packed));
 
     enum Code {
         NOTHING = 0,
@@ -78,26 +78,32 @@ public:
     public:
 
         Header() {}
-        Header(const Port from, const Port to, unsigned int size, const Code code = Code::NOTHING):
-            _from(from), _to(to), _length((size > sizeof(Data) ? sizeof(Data) : size) + sizeof(Header)), _code(code) {}
+        Header(const Address &from, const Address &to, unsigned int size, const Code code = Code::NOTHING):
+            _from(from), _to(to), _length(size + sizeof(Packet)), _code(code) {}
 
-        Port from() const { return _from; }
-        Port to() const { return _to; }
+        Address from() const { return _from; }
+        Address to() const { return _to; }
         unsigned short length() const { return _length; }
 
     protected:
-        Port _from;
-        Port _to;
+        Address _from;
+        Address _to;
         unsigned short _length;   // Length of datagram (header + data) in bytes
         Code _code;
-    };
+    }__attribute__((packed));
 
     class Packet
     {
     public:
-        Packet(){}
-        Packet(const Port from, const Port to, unsigned int size, const Code code = Code::NOTHING):
-            _header(Header(from, to, size, code)) {}
+        Packet() {}
+        Packet(Header &header, Data data):
+            _header(header) {
+                memcpy(_data, &data, sizeof(Data));
+            }
+        Packet(Header &header, const void* data, unsigned int size):
+            _header(header) {
+                memcpy(_data, data, size);
+            }
 
         Header * header() { return &_header; }
 
@@ -106,8 +112,8 @@ public:
 
     private:
         Header _header;
-        Data _data;
-    };
+        Data _data = {0};
+    }__attribute__((packed));
 
     static void init(unsigned int unit) {
         _networks[unit] = new (SYSTEM) DIRP(unit);
