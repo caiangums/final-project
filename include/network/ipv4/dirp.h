@@ -113,35 +113,34 @@ public:
         _networks[unit] = new (SYSTEM) DIRP(unit);
     }
 
-    class DIRP_Sender {
+    class DIRP_Sender
+    {
     public:
-        DIRP_Sender(bool * timeout, const Address::Local & from, const Address & to, DIRP * dirp, void * data, int size, int retries):
-            _timeout(timeout), _from(from), _to(to), _dirp(dirp), _data(data), _size(size), _retries(retries) {}
+        DIRP_Sender(const Address::Local & from, const Address & to, void * data, int size, DIRP * dirp, bool * timeout, int retries):
+            _from(from), _to(to), _data(data), _size(size), _dirp(dirp), _timeout(timeout), _retries(retries) {}
         ~DIRP_Sender() {}
 
         void resend() {
-            // in order to see this function called, uncomment this line
             db<DIRP_Sender>(WRN) << "DIRP_Sender::resend()" << endl;
-            if (this->_retries == 0) {
-                *(this->_timeout) = true;
-                this->_dirp->notify(this->_from, nullptr);
+            if (_retries == 0) {
+                *(_timeout) = true;
+                _dirp->notify(_from, nullptr);
                 return;
             }
-            this->_retries -= 1;
-            this->_dirp->nic()->send(this->_to.mac(), this->_dirp->PROTOCOL, this->_data, this->_size);
+            _retries--;
+            _dirp->nic()->send(_to.mac(), _dirp->PROTOCOL, _data, _size);
         }
 
     private:
-        bool * _timeout;
         const Address::Local _from;
         const Address _to;
-        DIRP * _dirp;
         void * _data;
         int _size;
+        DIRP * _dirp;
+        bool * _timeout;
         int _retries;
     };
 
-    //template<unsigned int UNIT = 0>  see IP()
     DIRP(unsigned int unit = 0) :
             _nic(Traits<Ethernet>::DEVICES::Get<0>::Result::get(unit))
     {
@@ -165,16 +164,16 @@ public:
         _nic->detach(this, PROTOCOL);
     }
 
-    const Address & address() { return _address;  }
-    const unsigned int mtu()  { return this->MTU; }
+    const Address & address()  { return _address;  }
+    const unsigned int mtu()   { return this->MTU; }
+    NIC<Ethernet>* nic() const { return _nic;      }
 
     static int send(const Address::Local & from, const Address & to, const void * data, unsigned int size);
-
-    //static int receive(Buffer * buf, Address* from, void * data, unsigned int size);
     static int receive(Buffer * buf, void * data, unsigned int size);
+
     void update(Observed* obs, const Protocol& prot, Buffer* buf);
 
-    /* Since DIRP is a Channel and it is observed, it has to allow observers to attach() and detach() theirselves to it () */
+    /* Since DIRP is a Channel and it is observed, it has to allow observers to attach() and detach() theirselves to/from it */
     static void attach(Observer * obs, const Port & port) { _observed.attach(obs, port); }
     static void detach(Observer * obs, const Port & port) { _observed.detach(obs, port); }
 
@@ -186,12 +185,12 @@ public:
         return _observed.notified(port);
     }
 
-    NIC<Ethernet>* nic() const { return _nic; }
-
 protected:
     static void retry_send(DIRP_Sender * dirp_sender) {
         dirp_sender->resend();
     }
+
+    static void acknowledged(char * data);
 
     NIC<Ethernet> * _nic;
     Address _address;
