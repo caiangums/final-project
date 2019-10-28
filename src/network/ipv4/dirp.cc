@@ -15,7 +15,8 @@ DIRP* DIRP::_networks[];
 static const int DELAY_SECONDS = 1000000;
 
 // TODOr use abstractions like Packet and Header
-int DIRP::send(const Address::Local & from, const Address & to, const void * data, unsigned int size) {
+int DIRP::send(const Address::Local & from, const Address & to, const void * data, unsigned int size)
+{
     // Get singleton DIRP
     DIRP * dirp = DIRP::get_by_nic(0);
 
@@ -32,55 +33,40 @@ int DIRP::send(const Address::Local & from, const Address & to, const void * dat
     // creates handler to resend message
     /* bool timeout = false;
     int retries = Traits<Network>::RETRIES;
-    DIRP::DIRP_Sender dirp_sender(&timeout, from, to, dirp, reinterpret_cast<void *>(packet), sizeof(packet), retries);
+    int timeout = Traits<Network>::TIMEOUT;
+    DIRP::DIRP_Sender dirp_sender(from, to, reinterpret_cast<void *>(packet), sizeof(packet), dirp, &timed_out, retries);
     dirp->_handler = new Functor_Handler<DIRP::DIRP_Sender>(&(DIRP::retry_send), &dirp_sender);
 
     // creates alarm that resend the message in case of no ACK received
-    dirp->_alarm = new Alarm((DELAY_SECONDS * (int)Traits<Network>::TIMEOUT/3), dirp->_handler, retries + 1);
+    dirp->_alarm = new Alarm((DELAY_SECONDS * (int) timeout/retries), dirp->_handler, retries + 1);
 
     // wait for ACK
     Buffer* buf = _observed.notified(from);
 
+    // at this point: either an ACK arrived or a timeout occurred.
+
     // cleanup alarm and handler
     delete dirp->_alarm;
     delete dirp->_handler;
- */
-    /*
-    * Pode chegar nesse ponto em dois casos:
-    * Quando o alarme der Timeout (caso em que buffer é nulo)
-    * Quando chegar um ACK, e o update() libera normalmente.
-    */
-/*     if (buf == nullptr || timeout) {
-        db<DIRP>(WRN) << "DIRP::update() - timeout or null buffer!" << endl;
+    if (buf == nullptr || timed_out) {
+        db<DIRP>(WRN) << "DIRP::send() - TIMEOUT!" << endl;
         return -1;
-    } */
-    //delete retries;
+    }
+    db<DIRP>(WRN) << "DIRP::send() - ACK received!" << endl;
+
+*/
     return size;
 }
 
 // TODOr use abstractions like Packet and Header
-int DIRP::receive(Buffer * buf, void * d, unsigned int s) {
+int DIRP::receive(Buffer * buf, void * d, unsigned int s)
+{
     Packet* packet = buf->frame()->data<Packet>();
     db<DIRP>(INF) << "Receiving from: MAC " << packet->header()->from() << endl;
     db<DIRP>(INF) << "Receiving into port: " << packet->header()->to().port() << endl;
     db<DIRP>(INF) << "Receiving data: " << packet->data<char>() << endl;
-    /* 
-    // ANSWER ACK
-    // get port
-    char port[port_size];
-    memcpy(port, data, port_size);
-    // get mac address
-    Ethernet::Address mac_addr;
-    memcpy(&mac_addr, &data[port_size], mac_size);  // n bytes is the port length
 
-    char packet[port_size + mac_size + ack_size];
-    Code ack = Code::ACK;
-
-    memcpy(packet, &port, port_size);  // add port
-    memcpy(&packet[port_size], &mac_addr, mac_size);  // add MAC after port
-    memcpy(&packet[port_size + mac_size], &ack, ack_size);  // add ACK after MAC
-    dirp->nic()->send(mac_addr, dirp->PROTOCOL, reinterpret_cast<void *>(packet), sizeof(packet));
-    */
+    //acknowledged();
 
     memcpy(d, packet->data<void>(), s);
     buf->nic()->free(buf);
@@ -88,7 +74,8 @@ int DIRP::receive(Buffer * buf, void * d, unsigned int s) {
     return s;
 }
 
-void DIRP::update(Observed* obs, const Protocol& prot, Buffer* buf) {
+void DIRP::update(Observed* obs, const Protocol& prot, Buffer* buf)
+{
     Packet packet;
     memcpy(&packet, buf->frame()->data<Packet>(), sizeof(Packet));
 
@@ -98,6 +85,33 @@ void DIRP::update(Observed* obs, const Protocol& prot, Buffer* buf) {
     if(!notify(port, buf))
         buf->nic()->free(buf);
 }
+
+void DIRP::acknowledged(char * data)
+{
+    unsigned int port_size = sizeof(Address::Local);
+    unsigned int mac_size = sizeof(Ethernet::Address);
+    unsigned int ack_size = sizeof(Code);
+    char packet[port_size + mac_size + ack_size];
+
+    // get port
+    char port[port_size];
+    memcpy(port, data, port_size);
+
+    // get mac address
+    Ethernet::Address mac_addr;
+    memcpy(&mac_addr, &data[port_size], mac_size);
+
+    Code ack = Code::ACK;
+
+    memcpy(packet, &port, port_size);  // add port
+    memcpy(&packet[port_size], &mac_addr, mac_size);  // add MAC after port
+    memcpy(&packet[port_size + mac_size], &ack, ack_size);  // add ACK after MAC
+
+    Delay (1000000);
+    DIRP* dirp = get_by_nic(0);
+    dirp->nic()->send(mac_addr, dirp->PROTOCOL, reinterpret_cast<void *>(packet), sizeof(packet));
+}
+
 
 __END_SYS
 
