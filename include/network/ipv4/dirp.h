@@ -28,7 +28,7 @@ public:
 
     static const unsigned int MTU      = Ethernet::MTU;
     const unsigned short      PROTOCOL = Ethernet::PROTO_DIRP;
-    typedef unsigned char Data[MTU];
+    typedef unsigned char Data[MTU-64];
 
     class Address
     {

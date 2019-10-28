@@ -23,9 +23,9 @@ int DIRP::send(const Address::Local & from, const Address & to, const void * dat
     Header header(Address(dirp->nic()->address(), from), to, size);
     Packet packet(header, data, size);
     
-    db<DIRP>(ERR) << "Sending from: MAC " << packet.header()->from() << endl;
-    db<DIRP>(ERR) << "Sending to: MAC " << packet.header()->to() << endl;
-    db<DIRP>(ERR) << "Sending data: " << packet.data<char>() << endl;
+    db<DIRP>(INF) << "Sending from MAC: " << packet.header()->from() << endl;
+    db<DIRP>(INF) << "Sending to MAC: " << packet.header()->to() << endl;
+    db<DIRP>(INF) << "Sending data: " << packet.data<char>() << endl;
 
     dirp->nic()->send(to.mac(), dirp->PROTOCOL, reinterpret_cast<void *>(&packet), sizeof(packet));
 
@@ -60,16 +60,12 @@ int DIRP::send(const Address::Local & from, const Address & to, const void * dat
 
 // TODOr use abstractions like Packet and Header
 int DIRP::receive(Buffer * buf, void * d, unsigned int s) {
-    //DIRP* dirp = get_by_nic(0);
-
-    char* data = buf->frame()->data<char>();
-    db<DIRP>(ERR) << "Receiving from: MAC " << data << endl;
-
     Packet* packet = buf->frame()->data<Packet>();
-    db<DIRP>(ERR) << "Receiving from: MAC " << packet->header()->from() << endl;
-    db<DIRP>(ERR) << "Receiving into port: " << packet->header()->to().port() << endl;
-    db<DIRP>(ERR) << "Receiving data: " << packet->data<char>() << endl;
+    db<DIRP>(INF) << "Receiving from: MAC " << packet->header()->from() << endl;
+    db<DIRP>(INF) << "Receiving into port: " << packet->header()->to().port() << endl;
+    db<DIRP>(INF) << "Receiving data: " << packet->data<char>() << endl;
     /* 
+    // ANSWER ACK
     // get port
     char port[port_size];
     memcpy(port, data, port_size);
@@ -84,7 +80,7 @@ int DIRP::receive(Buffer * buf, void * d, unsigned int s) {
     memcpy(&packet[port_size], &mac_addr, mac_size);  // add MAC after port
     memcpy(&packet[port_size + mac_size], &ack, ack_size);  // add ACK after MAC
     dirp->nic()->send(mac_addr, dirp->PROTOCOL, reinterpret_cast<void *>(packet), sizeof(packet));
- */
+    */
 
     memcpy(d, packet->data<void>(), s);
     buf->nic()->free(buf);
@@ -92,17 +88,11 @@ int DIRP::receive(Buffer * buf, void * d, unsigned int s) {
     return s;
 }
 
-// TODOr use abstractions like Packet and Header
 void DIRP::update(Observed* obs, const Protocol& prot, Buffer* buf) {
-    // TODOr 5 is: DATA_SIZE from main()
-    unsigned int size = 5 + 4 + 4 + 6;
-    char data[size];
+    Packet packet;
+    memcpy(&packet, buf->frame()->data<Packet>(), sizeof(Packet));
 
-    memcpy(data, buf->frame()->data<char>(), size);
-
-    // TODOr: remember that if we are getting 1 byte here, the DIRP port is limited to 127.
-    // the first byte of data represents an unsigned int, not a char
-    unsigned int port = (unsigned int)((unsigned char)(data[0]));
+    unsigned int port = packet.header()->to().port();
 
     buf->nic(_nic);
     if(!notify(port, buf))
