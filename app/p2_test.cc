@@ -1,4 +1,7 @@
 // EPOS NIC Test Programs
+//
+// Simple test to see communication working using Communicator_Common with
+// DIRP as a Channel.
 
 #include <time.h>
 
