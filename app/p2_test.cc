@@ -2,6 +2,8 @@
 //
 // Simple test to see communication working using Communicator_Common with
 // DIRP as a Channel.
+//
+// NOTE: to see TIMEOUT working, please, comment the line 69 of src/network/ipv4/dirp.cc
 
 #include <time.h>
 
@@ -55,7 +57,10 @@ int sender()
         memset(data, '0' + i, DATA_SIZE);
         data[DATA_SIZE - 1] = '\n';
         cout << "  Sending: " << data;
-        comm->send(dest_addr, &data, sizeof(data));
+        int result = comm->send(dest_addr, &data, sizeof(data));
+        if (result == -1) {
+            cout << "App: hm, so a timeout ocurred? I'll just ignore this." << endl;
+        }
     }
 }
 
