@@ -1,4 +1,6 @@
 // EPOS NIC Test Programs
+//
+// Ver comentários em main()
 
 #include <time.h>
 
