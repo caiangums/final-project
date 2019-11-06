@@ -3,6 +3,7 @@
 #include <network/ipv4/dirp.h>
 #include <system.h>
 #include <time.h>
+#include <machine/uart.h>
 
 #ifdef __ipv4__
 
@@ -104,6 +105,16 @@ void DIRP::acknowledged(Packet * pkt)
     dirp->nic()->send(h->from().mac(), dirp->PROTOCOL, reinterpret_cast<void *>(&packet), sizeof(packet));
 }
 
+int DIRP::get_time() {
+    db<DIRP>(INF) << "Asking time to Serial..." << endl;
+    UART uart(0, 115200, 8, 0, 1); // using 0 for network, 1 is default for console (-serial mon:stdio)
+    uart.loopback(true);
+    uart.put('z');
+    
+    int current_time = uart.get();
+    db<DIRP>(INF) << "Received time: " << current_time << endl;
+    return current_time;
+}
 
 __END_SYS
 

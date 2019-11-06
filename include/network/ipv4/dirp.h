@@ -190,7 +190,9 @@ public:
         return _observed.notified(port);
     }
 
+    static int get_time();
 protected:
+
     static void retry_send(DIRP_Sender * dirp_sender) {
         dirp_sender->resend();
     }
