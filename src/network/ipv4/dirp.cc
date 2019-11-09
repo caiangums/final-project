@@ -4,6 +4,7 @@
 #include <system.h>
 #include <time.h>
 #include <machine/uart.h>
+#include <utility/random.h>
 
 #ifdef __ipv4__
 
@@ -67,14 +68,29 @@ int DIRP::send(const Address::Local & from, const Address & to, const void* data
 int DIRP::receive(Buffer * buf, void * d, unsigned int s)
 {
     DIRP * dirp = DIRP::get_by_nic(0);
+    
+    /* Nota:
+     * Mudar o _elapsed aparentemente não faz nada com o clock->now()
+     * Ver o que realmente tem que mudar para atualizar o relógio.
+     */
+    // Add random delay to emulate desynchronizing
+    Alarm::elapsed() += (Random::random()%200)- 100;
+
     db<DIRP>(WRN) << "DIRP::receive() - _clock->now()= " << reinterpret_cast<long unsigned int>(dirp->_clock->now()) << endl;
     db<DIRP>(WRN) << "DIRP::receive() - Alarm::elapsed()= " << reinterpret_cast<int>(Alarm::elapsed()) << endl;
 
     Packet* packet = buf->frame()->data<Packet>();
-    db<DIRP>(WRN) << "Receiving from: MAC " << packet->header()->from() << endl;
+    Address from = packet->header()->from();
+    db<DIRP>(WRN) << "Receiving from: MAC " << from << endl;
     db<DIRP>(WRN) << "Receiving into port: " << packet->header()->to().port() << endl;
     db<DIRP>(WRN) << "Receiving data: " << packet->data<char>() << endl;
     db<DIRP>(WRN) << "Receiving timestamp: " << packet->header()->timestamp() << endl;
+
+    // Se o pacote estiver vindo do Master
+    if (dirp->is_master(from)) {
+        dirp->synchronize_time(packet->header()->timestamp());
+    }
+
 
     acknowledged(packet);
 
@@ -82,6 +98,39 @@ int DIRP::receive(Buffer * buf, void * d, unsigned int s)
     buf->nic()->free(buf);
 
     return s;
+}
+
+void DIRP::synchronize_time(Second timestamp) {
+    /* 
+     * When receives first packet from master:
+     * - saves master's timestamp and its own time
+     * - mark flag to indicate synchronizing algorithm started
+     */
+    if (!NTP.synchronizing) {
+        NTP.ts[0] = timestamp;
+        NTP.ts[1] = _clock->now();
+        NTP.synchronizing = true;
+    }
+    /* When receives second packet:
+     * - saves master's timestamp and its own time
+     * - use all (4) saved timestamps to calculate Propagation Delay and Offset
+     * - Updates own clock
+     * - mark flag to indicate synchronizing is done
+     */
+    else {
+        NTP.ts[2] = timestamp;
+        NTP.ts[3] = _clock->now();
+
+        Second PD = (NTP.ts[1] - NTP.ts[0] + NTP.ts[3] - NTP.ts[2])/2;
+        Second offset = NTP.ts[1] - NTP.ts[0] - PD;
+        db<DIRP>(WRN) << "offset = " << reinterpret_cast<long unsigned int>(offset) << endl;
+
+        // Mudar o elapsed aparentemente não funciona
+        Alarm::elapsed() -= offset*1000;
+        NTP.synchronizing = false;
+        db<DIRP>(WRN) << "new _clock->now() = " << reinterpret_cast<long unsigned int>(_clock->now()) << endl;
+        db<DIRP>(WRN) << "new Alarm::elapsed() = " << reinterpret_cast<int>(Alarm::elapsed()) << endl;
+    }
 }
 
 void DIRP::update(Observed* obs, const Protocol& prot, Buffer* buf)
@@ -115,6 +164,8 @@ void DIRP::acknowledged(Packet * pkt)
 }
 
 int DIRP::get_time() {
+    // NOT WORKING
+
     db<DIRP>(INF) << "Asking time to Serial..." << endl;
     UART uart(0, 115200, 8, 0, 1); // using 0 for network, 1 is default for console (-serial mon:stdio)
     uart.loopback(true);

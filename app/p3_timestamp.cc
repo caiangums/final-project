@@ -10,7 +10,7 @@ using namespace EPOS;
 OStream cout;
 
 const int DATA_SIZE = 5;
-const int DATA_ITER = 10;
+const int DATA_ITER = 5;
 
 char data[DATA_SIZE];
 DIRP::Address self_addr;
@@ -29,7 +29,7 @@ int main()
     cout << "  MAC: " << self_addr << endl;
 
     if (self_addr[5] % 2) {  // sender
-        Delay (5000000);
+        Delay (2000000);
         sender();
     } else {  // receiver
         receiver();

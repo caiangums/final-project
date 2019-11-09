@@ -31,6 +31,8 @@ public:
     const unsigned short      PROTOCOL = Ethernet::PROTO_DIRP;
     typedef unsigned char Data[MTU-64];
 
+    typedef RTC::Second Second;
+
     class Address
     {
     public:
@@ -79,19 +81,19 @@ public:
     public:
 
         Header() {}
-        Header(const Address &from, const Address &to, unsigned int size, const RTC::Second timestamp, const Code code = Code::NOTHING):
+        Header(const Address &from, const Address &to, unsigned int size, const Second timestamp, const Code code = Code::NOTHING):
             _from(from), _to(to), _length(size + sizeof(Packet)), _timestamp(timestamp), _code(code) {}
 
         Address from() const { return _from; }
         Address to() const { return _to; }
         unsigned short length() const { return _length; }
-        RTC::Second timestamp() const { return _timestamp; }
+        Second timestamp() const { return _timestamp; }
 
     protected:
         Address _from;
         Address _to;
         unsigned short _length;   // Length of datagram (header + data) in bytes
-        RTC::Second _timestamp;
+        Second _timestamp;
         Code _code;
     }__attribute__((packed));
 
@@ -156,7 +158,6 @@ public:
         _nic->attach(this, PROTOCOL);
 
         _address.mac(_nic->address());
-        _is_server = is_server();
 
         _networks[unit] = this;
         _clock = new Clock();
@@ -206,8 +207,8 @@ protected:
 
     static void acknowledged(Packet * pkt);
 
-    bool is_server() {
-        return _address.mac()[5] == 9;
+    bool is_master(const Address& addr) {
+        return addr.mac()[5] == 9;
     }
 
     NIC<Ethernet>* _nic;
@@ -215,10 +216,19 @@ protected:
     Functor_Handler<DIRP_Sender>* _handler;
     Alarm* _alarm;
     Clock* _clock;
-    bool _is_server;
 
     static Observed _observed;
     static DIRP* _networks[Traits<Ethernet>::UNITS];
+
+    /*
+     * Struct to keep network time protocol data
+     */
+    struct {
+        Second ts[4] = {0,0,0,0};
+        bool synchronizing = false;
+    } NTP;
+
+    void synchronize_time(Second timestamp);
 };
 
 __END_SYS
