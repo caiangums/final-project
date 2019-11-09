@@ -6,15 +6,20 @@ HOST = "127.0.0.1"  # Standard loopback interface address (localhost)
 PORT = 65432        # Port to listen on (non-privileged ports are > 1023)
 
 def send_time(conn):
-    conn.sendall("Ok!".encode())
+    conn.sendall('aloha'.encode())
 
 
 def receive(conn):
     while True:
-        data = conn.recv(1024)
+        data = conn.recv(1)
         if not data:
+            print("nothing")
             break
-        print("Message received: ", data.decode())
+        d = data.decode()
+        if ord(d) == 36:
+            print("\nMessage received: ", d)
+        else:
+            print(d, end='')
         send_time(conn)
 
 
