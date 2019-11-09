@@ -97,7 +97,7 @@ UUID			= $(shell cat /proc/sys/kernel/random/uuid | sed 's/-//g')
 pc_CC_FLAGS		:= -Wa,--32 -Wno-builtin-declaration-mismatch -Wno-array-bounds
 pc_AS_FLAGS		:= --32
 pc_LD_FLAGS		:=
-pc_EMULATOR		= qemu-system-i386  -D /tmp/qemu-debug-log -d int,page,mmu,pcall,unimp,cpu_reset,guest_errors -smp $(CPUS) -m $(MEM_SIZE)k -serial tcp:127.0.0.1:65432 -serial mon:stdio -nographic -no-reboot -drive format=raw,index=0,if=floppy,read-only,file=
+pc_EMULATOR		= qemu-system-i386  -D /tmp/qemu-debug-log -d int,page,mmu,pcall,unimp,cpu_reset,guest_errors -smp $(CPUS) -m $(MEM_SIZE)k -nographic -no-reboot -drive format=raw,index=0,if=floppy,read-only,file=
 pc_DEBUGGER		:= gdb
 pc_FLASHER		:=
 pc_MAGIC		:= --nmagic

@@ -7,13 +7,14 @@
 
 #include <machine/nic.h>
 #include <synchronizer.h>
+#include <time.h>
 
 __BEGIN_SYS
 
 // DIR_Protocol as a Channel
 class DIRP: private NIC<Ethernet>::Observer
 {
-
+    friend class Alarm; // for elapsed()
 public:
     typedef Ethernet::Protocol Protocol;
 
@@ -78,17 +79,19 @@ public:
     public:
 
         Header() {}
-        Header(const Address &from, const Address &to, unsigned int size, const Code code = Code::NOTHING):
-            _from(from), _to(to), _length(size + sizeof(Packet)), _code(code) {}
+        Header(const Address &from, const Address &to, unsigned int size, const RTC::Second timestamp, const Code code = Code::NOTHING):
+            _from(from), _to(to), _length(size + sizeof(Packet)), _timestamp(timestamp), _code(code) {}
 
         Address from() const { return _from; }
         Address to() const { return _to; }
         unsigned short length() const { return _length; }
+        RTC::Second timestamp() const { return _timestamp; }
 
     protected:
         Address _from;
         Address _to;
         unsigned short _length;   // Length of datagram (header + data) in bytes
+        RTC::Second _timestamp;
         Code _code;
     }__attribute__((packed));
 
@@ -153,7 +156,10 @@ public:
         _nic->attach(this, PROTOCOL);
 
         _address.mac(_nic->address());
+        _is_server = is_server();
+
         _networks[unit] = this;
+        _clock = new Clock();
     }
 
     static DIRP * get_by_nic(unsigned int unit) {
@@ -167,6 +173,7 @@ public:
     ~DIRP() {
         db<DIRP>(TRC) << "DIRP::~DIRP()" << endl;
         _nic->detach(this, PROTOCOL);
+        delete _clock;
     }
 
     const Address & address()  { return _address;  }
@@ -199,13 +206,19 @@ protected:
 
     static void acknowledged(Packet * pkt);
 
-    NIC<Ethernet> * _nic;
+    bool is_server() {
+        return _address.mac()[5] == 9;
+    }
+
+    NIC<Ethernet>* _nic;
     Address _address;
-    Functor_Handler<DIRP_Sender> * _handler;
-    Alarm * _alarm;
+    Functor_Handler<DIRP_Sender>* _handler;
+    Alarm* _alarm;
+    Clock* _clock;
+    bool _is_server;
 
     static Observed _observed;
-    static DIRP * _networks[Traits<Ethernet>::UNITS];
+    static DIRP* _networks[Traits<Ethernet>::UNITS];
 };
 
 __END_SYS

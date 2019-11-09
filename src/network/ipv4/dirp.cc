@@ -16,13 +16,13 @@ DIRP* DIRP::_networks[];
 static const int DELAY_SECONDS = 1000000;
 
 // TODOr use abstractions like Packet and Header
-int DIRP::send(const Address::Local & from, const Address & to, const void * data, unsigned int size)
+int DIRP::send(const Address::Local & from, const Address & to, const void* data, unsigned int size)
 {
     // Get singleton DIRP
     DIRP * dirp = DIRP::get_by_nic(0);
 
     // Our packet has a header with addresses, plus the data to be sent
-    Header header(Address(dirp->nic()->address(), from), to, size);
+    Header header(Address(dirp->nic()->address(), from), to, size, dirp->_clock->now());
     Packet packet(header, data, size);
     
     db<DIRP>(INF) << "Sending from MAC: " << packet.header()->from() << endl;
@@ -41,9 +41,13 @@ int DIRP::send(const Address::Local & from, const Address & to, const void * dat
     // creates alarm that resend the message in case of no ACK received
     dirp->_alarm = new Alarm((DELAY_SECONDS * (int) timeout/retries), dirp->_handler, retries + 1);
 
+    db<DIRP>(WRN) << "DIRP::send() - _clock->now()= " << reinterpret_cast<long unsigned int>(dirp->_clock->now()) << endl;
+    db<DIRP>(WRN) << "DIRP::send() before - Alarm::elapsed()= " << reinterpret_cast<int>(Alarm::elapsed()) << endl;
+
     // wait for ACK
     Buffer* buf = _observed.notified(from);
 
+    db<DIRP>(WRN) << "DIRP::send() after - Alarm::elapsed()= " << reinterpret_cast<int>(Alarm::elapsed()) << endl;
     // at this point: either an ACK arrived or a ocurred timeout.
 
     // cleanup alarm and handler
@@ -62,10 +66,15 @@ int DIRP::send(const Address::Local & from, const Address & to, const void * dat
 // TODOr use abstractions like Packet and Header
 int DIRP::receive(Buffer * buf, void * d, unsigned int s)
 {
+    DIRP * dirp = DIRP::get_by_nic(0);
+    db<DIRP>(WRN) << "DIRP::receive() - _clock->now()= " << reinterpret_cast<long unsigned int>(dirp->_clock->now()) << endl;
+    db<DIRP>(WRN) << "DIRP::receive() - Alarm::elapsed()= " << reinterpret_cast<int>(Alarm::elapsed()) << endl;
+
     Packet* packet = buf->frame()->data<Packet>();
-    db<DIRP>(INF) << "Receiving from: MAC " << packet->header()->from() << endl;
-    db<DIRP>(INF) << "Receiving into port: " << packet->header()->to().port() << endl;
-    db<DIRP>(INF) << "Receiving data: " << packet->data<char>() << endl;
+    db<DIRP>(WRN) << "Receiving from: MAC " << packet->header()->from() << endl;
+    db<DIRP>(WRN) << "Receiving into port: " << packet->header()->to().port() << endl;
+    db<DIRP>(WRN) << "Receiving data: " << packet->data<char>() << endl;
+    db<DIRP>(WRN) << "Receiving timestamp: " << packet->header()->timestamp() << endl;
 
     acknowledged(packet);
 
@@ -96,12 +105,12 @@ void DIRP::acknowledged(Packet * pkt)
     unsigned short nothing = 0;
     memcpy(data, &nothing, sizeof(unsigned short));
 
+    DIRP* dirp = get_by_nic(0);
     Address self(h->to().mac(), h->to().port());
-    Header header(self, h->from(), size, Code::ACK);
+    Header header(self, h->from(), size, dirp->_clock->now(), Code::ACK);
     Packet packet(header, data, size);
 
     Delay (1000000);
-    DIRP* dirp = get_by_nic(0);
     dirp->nic()->send(h->from().mac(), dirp->PROTOCOL, reinterpret_cast<void *>(&packet), sizeof(packet));
 }
 
