@@ -42,6 +42,7 @@ int DIRP::send(const Address::Local & from, const Address & to, const void* data
     // creates alarm that resend the message in case of no ACK received
     dirp->_alarm = new Alarm((DELAY_SECONDS * (int) timeout/retries), dirp->_handler, retries + 1);
 
+    db<DIRP>(WRN) << "DIRP::send() - _clock_start_time= " << dirp->_clock_start_time << endl;
     db<DIRP>(WRN) << "DIRP::send() - _clock->now()= " << reinterpret_cast<long unsigned int>(dirp->_clock->now()) << endl;
     db<DIRP>(WRN) << "DIRP::send() before - Alarm::elapsed()= " << reinterpret_cast<int>(Alarm::elapsed()) << endl;
 
@@ -76,6 +77,7 @@ int DIRP::receive(Buffer * buf, void * d, unsigned int s)
     // Add random delay to emulate desynchronizing
     Alarm::elapsed() += (Random::random()%200)- 100;
 
+    db<DIRP>(WRN) << "DIRP::receive() - _clock_start_time= " << dirp->_clock_start_time << endl;
     db<DIRP>(WRN) << "DIRP::receive() - _clock->now()= " << reinterpret_cast<long unsigned int>(dirp->_clock->now()) << endl;
     db<DIRP>(WRN) << "DIRP::receive() - Alarm::elapsed()= " << reinterpret_cast<int>(Alarm::elapsed()) << endl;
 
@@ -126,10 +128,12 @@ void DIRP::synchronize_time(Second timestamp) {
         db<DIRP>(WRN) << "offset = " << reinterpret_cast<long unsigned int>(offset) << endl;
 
         // Mudar o elapsed aparentemente não funciona
-        Alarm::elapsed() -= offset*1000;
+        db<DIRP>(WRN) << "(before) new Alarm::elapsed() = " << reinterpret_cast<int>(Alarm::elapsed()) << endl;
+        int elapsed = Alarm::elapsed() - (1 + offset) * 1000;
+        Alarm::elapsed(elapsed);
         NTP.synchronizing = false;
         db<DIRP>(WRN) << "new _clock->now() = " << reinterpret_cast<long unsigned int>(_clock->now()) << endl;
-        db<DIRP>(WRN) << "new Alarm::elapsed() = " << reinterpret_cast<int>(Alarm::elapsed()) << endl;
+        db<DIRP>(WRN) << "(after) new Alarm::elapsed() = " << reinterpret_cast<int>(Alarm::elapsed()) << endl;
     }
 }
 

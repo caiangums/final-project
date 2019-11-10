@@ -161,6 +161,7 @@ public:
 
         _networks[unit] = this;
         _clock = new Clock();
+        _clock_start_time = _clock->now();
     }
 
     static DIRP * get_by_nic(unsigned int unit) {
@@ -215,6 +216,7 @@ protected:
     Address _address;
     Functor_Handler<DIRP_Sender>* _handler;
     Alarm* _alarm;
+    long unsigned int _clock_start_time;
     Clock* _clock;
 
     static Observed _observed;
