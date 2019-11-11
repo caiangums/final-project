@@ -16,7 +16,6 @@ DIRP* DIRP::_networks[];
 
 static const int DELAY_SECONDS = 1000000;
 
-// TODOr use abstractions like Packet and Header
 int DIRP::send(const Address::Local & from, const Address & to, const void* data, unsigned int size)
 {
     // Get singleton DIRP
@@ -50,7 +49,7 @@ int DIRP::send(const Address::Local & from, const Address & to, const void* data
     Buffer* buf = _observed.notified(from);
 
     db<DIRP>(WRN) << "DIRP::send() after - Alarm::elapsed()= " << reinterpret_cast<int>(Alarm::elapsed()) << endl;
-    // at this point: either an ACK arrived or a ocurred timeout.
+    // at this point: either an ACK arrived or timeout ocurred.
 
     // cleanup alarm and handler
     delete dirp->_alarm;
@@ -65,7 +64,6 @@ int DIRP::send(const Address::Local & from, const Address & to, const void* data
     return size;
 }
 
-// TODOr use abstractions like Packet and Header
 int DIRP::receive(Buffer * buf, void * d, unsigned int s)
 {
     DIRP * dirp = DIRP::get_by_nic(0);
@@ -88,11 +86,9 @@ int DIRP::receive(Buffer * buf, void * d, unsigned int s)
     db<DIRP>(WRN) << "Receiving data: " << packet->data<char>() << endl;
     db<DIRP>(WRN) << "Receiving timestamp: " << packet->header()->timestamp() << endl;
 
-    // Se o pacote estiver vindo do Master
     if (dirp->is_master(from)) {
         dirp->synchronize_time(packet->header()->timestamp());
     }
-
 
     acknowledged(packet);
 
@@ -102,7 +98,8 @@ int DIRP::receive(Buffer * buf, void * d, unsigned int s)
     return s;
 }
 
-void DIRP::synchronize_time(Second timestamp) {
+void DIRP::synchronize_time(Second timestamp)
+{
     /* 
      * When receives first packet from master:
      * - saves master's timestamp and its own time
@@ -113,6 +110,7 @@ void DIRP::synchronize_time(Second timestamp) {
         NTP.ts[1] = _clock->now();
         NTP.synchronizing = true;
     }
+
     /* When receives second packet:
      * - saves master's timestamp and its own time
      * - use all (4) saved timestamps to calculate Propagation Delay and Offset
