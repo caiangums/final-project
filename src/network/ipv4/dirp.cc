@@ -68,12 +68,9 @@ int DIRP::receive(Buffer * buf, void * d, unsigned int s)
 {
     DIRP * dirp = DIRP::get_by_nic(0);
     
-    /* Nota:
-     * Mudar o _elapsed aparentemente não faz nada com o clock->now()
-     * Ver o que realmente tem que mudar para atualizar o relógio.
-     */
     // Add random delay to emulate desynchronizing
-    Alarm::elapsed() += (Random::random()%200)- 100;
+    int elapsed = Alarm::elapsed() + (Random::random()%200) - 100;
+    Alarm::elapsed(elapsed);
 
     db<DIRP>(WRN) << "DIRP::receive() - _clock_start_time= " << dirp->_clock_start_time << endl;
     db<DIRP>(WRN) << "DIRP::receive() - _clock->now()= " << reinterpret_cast<long unsigned int>(dirp->_clock->now()) << endl;
