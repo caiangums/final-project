@@ -28,12 +28,14 @@ public:
     void date(const Date & d) { return RTC::date(d); }
 };
 
+class DIRP;
 
 class Alarm
 {
     friend class System;                        // for init()
     template<typename> friend class Clerk;      // for elapsed()
     friend class Alarm_Chronometer;             // for elapsed()
+    friend class DIRP;                          // for elapsed()
     friend class Periodic_Thread;               // for ticks() and elapsed()
     friend class RT_Thread;                     // for ticks() and elapsed()
     friend class Scheduling_Criteria::FCFS;     // for ticks() and elapsed()
@@ -67,6 +69,8 @@ private:
     static void init();
 
     static volatile Tick & elapsed() { return _elapsed; }
+
+    static volatile void elapsed(volatile Tick & elapsed) { _elapsed = elapsed; }
 
     static Microsecond timer_period() { return 1000000 / frequency(); }
     static Tick ticks(const Microsecond & time) { return (time + timer_period() / 2) / timer_period(); }

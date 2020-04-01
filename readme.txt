@@ -1,28 +1,26 @@
 Alunos: Diogo Junior, Ilê Caian Gums, Ramna Sidharta
 
-Como não conseguimos finalizar a implementação do driver, realizamos os testes considerando a NIC PCNet32. O relatório explicando a implementação do driver se encontra no pdf em anexo (Relatorio_Implementacao_Driver.pdf).
-Em anexo a esse tarball seguem apenas os arquivos criados ou alterados em relação a revisão 5501 do EPOS. O projeto completo se encontra no endereço: https://github.com/caian-gums/final-project
+O arquivo de teste utilizado é nomeado de app/p3_timestamp.cc. A configuração
+de logs de warning está ativada para essa aplicação, assim executando ela normalmente
+com `make APPLICATION=p3_timestamp` mostrará nos consoles do recebtor e transmissor
+os seus respectivos tempos `Alarm::_elapsed()` e timestamps.
 
-# Desenvolvimento
+Para essa entrega, executamos a sincronização com o tempo do master (fazendo uma
+checagem, no receptor, de endereço transmissor) a cada duas mensagens recebidas
+dele.
 
-Foi criado um protocolo simplificado (DIR_Protocol), que funciona como um communicator, com a função de desacoplar a comunicação com a NIC e o tratamento da transferência de dados do escopo da aplicação.
-Esse protocolo foi acrescentado no arquivo `include/communicator.h` e inclui uma pequena alteração no arquivo `include/network/ethernet.h`
+Timestamps são agora sempre adicionados ao Header do DIRP, porém apenas utilizados
+em mensagens recebidas do master.
 
-# Arquivos de Testes
+O tempo enviado pelo master é literalmente seu valor para `Clock::now()` no momento
+do envio. Isso significa que não implementamos a obtenção do tempo de um "servidor
+de tempo", através de comunicação por porta serial com um QEMU executando uma aplicação
+python. Tentamos implementar essa primeira etapa, contudo não conseguimos tê-la funcionando.
 
-- Teste demonstrando a operação do driver com DMA, tanto para recepção quanto para transmissão:
-Foram criados dois arquivos de teste separados, com suas respectivas traits:
-`dma_test1.cc` `dma_test1_traits.h`
-`dma_test2.cc` `dma_test2_traits.h`
-O primeiro arquivo realiza a execução de uma tarefa CPU-bound (utilizado cálculo de fibonacci como exemplo), seguida de uma tarefa com uso intensivo da rede (utilizando troca de mensagens entre dois QEMUs). O tempo de cada tarefa é calculado.
-O segundo arquivo realiza a execução das duas tarefas concorrentemente, com a criação de uma Thread para cada. Como o tempo total calculado é levemente maior do que o máximo do primeiro teste, mostra-se que a NIC está utilizando DMA, caso contrário as duas tarefas teriam que ser executadas integralmente pela CPU e o tempo total seria igual a soma dos tempos do primeiro teste.
+O arquivo do servidor python é `app/server.py`. A aplicação `app/timestamp_test.cc`
+foi o código utilizado para os testes de comunicação com o servidor.
 
-- Teste demonstrando a operação do driver suportando comunicação entre dois QEMUs, operando com interrupções, e o fluxo de pacotes de rede entre o driver e a aplicação considerando o desacoplamento do tratamento de interrupções, o escalonamento e a transferência dos dados para o escopo da aplicação:
-E os arquivos de teste respectivos criados:
-`dir_protocol_test.cc`
-`dir_protocol_test_traits.h`
-
-- Teste demonstrando a interoperabilidade com outros protocolos:
-Foram criados dois testes, demonstrando que a comunicação através do DIR_Protocol opera sem conflito com outros protocolos.
-`dir_interop_test.cc` `dir_interop_test_traits.h`
-`dir_interop_test_simple.cc` `dir_interop_test_simple_traits.h`
+Para a sincronização temporal, utilizamos o algorítmo NTP simplificado e adaptado
+para o nosso cenário. O offset é calculado a partir da média das diferenças dos
+relógios do transmissor e receptor para as duas mensagens recebidas anteriormente.
+Alarm::_elapsed é então alterado de acordo com esse offset.

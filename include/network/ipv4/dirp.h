@@ -6,13 +6,15 @@
 #ifdef __ipv4__
 
 #include <machine/nic.h>
+#include <synchronizer.h>
+#include <time.h>
 
 __BEGIN_SYS
 
 // DIR_Protocol as a Channel
 class DIRP: private NIC<Ethernet>::Observer
 {
-
+    friend class Alarm; // for elapsed()
 public:
     typedef Ethernet::Protocol Protocol;
 
@@ -23,13 +25,15 @@ public:
     typedef Data_Observer<Buffer, Protocol> Observer;
     typedef Data_Observed<Buffer, Protocol> Observed;
 
-    typedef unsigned int Port;
+    typedef unsigned short Port;
 
     static const unsigned int MTU      = Ethernet::MTU;
     const unsigned short      PROTOCOL = Ethernet::PROTO_DIRP;
-    typedef unsigned char Data[MTU];
+    typedef unsigned char Data[MTU-64];
 
-    class Address  // maybe this could iherit from Ethernet::Address
+    typedef RTC::Second Second;
+
+    class Address
     {
     public:
         typedef Port Local;
@@ -65,7 +69,7 @@ public:
     private:
         Ethernet::Address _mac;
         Port _port;
-    };
+    }__attribute__((packed));
 
     enum Code {
         NOTHING = 0,
@@ -77,26 +81,34 @@ public:
     public:
 
         Header() {}
-        Header(const Port from, const Port to, unsigned int size, const Code code = Code::NOTHING):
-            _from(from), _to(to), _length((size > sizeof(Data) ? sizeof(Data) : size) + sizeof(Header)), _code(code) {}
+        Header(const Address &from, const Address &to, unsigned int size, const Second timestamp, const Code code = Code::NOTHING):
+            _from(from), _to(to), _length(size + sizeof(Packet)), _timestamp(timestamp), _code(code) {}
 
-        Port from() const { return _from; }
-        Port to() const { return _to; }
+        Address from() const { return _from; }
+        Address to() const { return _to; }
         unsigned short length() const { return _length; }
+        Second timestamp() const { return _timestamp; }
 
     protected:
-        Port _from;
-        Port _to;
+        Address _from;
+        Address _to;
         unsigned short _length;   // Length of datagram (header + data) in bytes
+        Second _timestamp;
         Code _code;
-    };
+    }__attribute__((packed));
 
     class Packet
     {
     public:
-        Packet(){}
-        Packet(const Port from, const Port to, unsigned int size, const Code code = Code::NOTHING):
-            _header(Header(from, to, size, code)) {}
+        Packet() {}
+        Packet(Header &header, Data data):
+            _header(header) {
+                memcpy(_data, &data, sizeof(Data));
+            }
+        Packet(Header &header, const void* data, unsigned int size):
+            _header(header) {
+                memcpy(_data, data, size);
+            }
 
         Header * header() { return &_header; }
 
@@ -105,14 +117,40 @@ public:
 
     private:
         Header _header;
-        Data _data;
-    };
+        Data _data = {0};
+    }__attribute__((packed));
 
     static void init(unsigned int unit) {
         _networks[unit] = new (SYSTEM) DIRP(unit);
     }
 
-    //template<unsigned int UNIT = 0>  see IP()
+    class DIRP_Sender
+    {
+    public:
+        DIRP_Sender(const Packet packet, const unsigned int size, DIRP * dirp, bool * timeout, int retries):
+            _packet(packet), _size(size), _dirp(dirp), _timeout(timeout), _retries(retries) {}
+        ~DIRP_Sender() {}
+
+        void resend() {
+            db<DIRP_Sender>(WRN) << "DIRP_Sender::resend()" << endl;
+            Header * header = _packet.header();
+            if (_retries == 0) {
+                *(_timeout) = true;
+                _dirp->notify(header->from().port(), nullptr);
+                return;
+            }
+            _retries--;
+            _dirp->nic()->send(header->to().mac(), _dirp->PROTOCOL, reinterpret_cast<void *>(&_packet), _size);
+        }
+
+    private:
+        Packet _packet;
+        unsigned int _size;
+        DIRP * _dirp;
+        bool * _timeout;
+        int _retries;
+    };
+
     DIRP(unsigned int unit = 0) :
             _nic(Traits<Ethernet>::DEVICES::Get<0>::Result::get(unit))
     {
@@ -120,7 +158,10 @@ public:
         _nic->attach(this, PROTOCOL);
 
         _address.mac(_nic->address());
+
         _networks[unit] = this;
+        _clock = new Clock();
+        _clock_start_time = _clock->now();
     }
 
     static DIRP * get_by_nic(unsigned int unit) {
@@ -134,18 +175,19 @@ public:
     ~DIRP() {
         db<DIRP>(TRC) << "DIRP::~DIRP()" << endl;
         _nic->detach(this, PROTOCOL);
+        delete _clock;
     }
 
-    const Address & address() { return _address;  }
-    const unsigned int mtu()  { return this->MTU; }
+    const Address & address()  { return _address;  }
+    const unsigned int mtu()   { return this->MTU; }
+    NIC<Ethernet>* nic() const { return _nic;      }
 
     static int send(const Address::Local & from, const Address & to, const void * data, unsigned int size);
-
-    //static int receive(Buffer * buf, Address* from, void * data, unsigned int size);
     static int receive(Buffer * buf, void * data, unsigned int size);
+
     void update(Observed* obs, const Protocol& prot, Buffer* buf);
 
-    /* Since DIRP is a Channel and it is observed, it has to allow observers to attach() and detach() theirselves to it () */
+    /* Since DIRP is a Channel and it is observed, it has to allow observers to attach() and detach() theirselves to/from it */
     static void attach(Observer * obs, const Port & port) { _observed.attach(obs, port); }
     static void detach(Observer * obs, const Port & port) { _observed.detach(obs, port); }
 
@@ -153,14 +195,42 @@ public:
         return _observed.notify(port, buf);
     }
 
-    NIC<Ethernet>* nic() const { return _nic; }
+    static bool notified(const Port & port) {
+        return _observed.notified(port);
+    }
 
+    static int get_time();
 protected:
-    NIC<Ethernet> * _nic;
+
+    static void retry_send(DIRP_Sender * dirp_sender) {
+        dirp_sender->resend();
+    }
+
+    static void acknowledged(Packet * pkt);
+
+    bool is_master(const Address& addr) {
+        return addr.mac()[5] == 9;
+    }
+
+    NIC<Ethernet>* _nic;
     Address _address;
+    Functor_Handler<DIRP_Sender>* _handler;
+    Alarm* _alarm;
+    long unsigned int _clock_start_time;
+    Clock* _clock;
 
     static Observed _observed;
-    static DIRP * _networks[Traits<Ethernet>::UNITS];
+    static DIRP* _networks[Traits<Ethernet>::UNITS];
+
+    /*
+     * Struct to keep network time protocol data
+     */
+    struct {
+        Second ts[4] = {0,0,0,0};
+        bool synchronizing = false;
+    } NTP;
+
+    void synchronize_time(Second timestamp);
 };
 
 __END_SYS
